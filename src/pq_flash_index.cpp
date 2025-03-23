@@ -1558,8 +1558,16 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                             float *dists_out) {
         // Vector[0], {3, 6, 2}
         // Distance = d[3][1] + d[6][2] + d[2][3]
-        diskann::aggregate_coords(ids, n_ids, this->data, this->_n_chunks, pq_coord_scratch);
-        diskann::pq_dist_lookup(pq_coord_scratch, n_ids, this->_n_chunks, pq_dists, dists_out);
+        bool recompute_beighbor_embeddings = false;
+        if (!recompute_beighbor_embeddings) {
+            diskann::aggregate_coords(ids, n_ids, this->data, this->_n_chunks, pq_coord_scratch);
+            diskann::pq_dist_lookup(pq_coord_scratch, n_ids, this->_n_chunks, pq_dists, dists_out);
+        } else {
+
+            //TODO: fecth the embeddings from the embedding server @yichuan finish here
+            diskann::aggregate_coords(ids, n_ids, this->data, this->_n_chunks, pq_coord_scratch);
+            diskann::pq_dist_lookup(pq_coord_scratch, n_ids, this->_n_chunks, pq_dists, dists_out);
+        }
     };
     Timer query_timer, io_timer, cpu_timer;
 
@@ -1844,6 +1852,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             uint32_t *node_nbrs = (node_buf + 1);
             // compute node_nbrs <-> query dist in PQ space
             cpu_timer.reset();
+
             compute_dists(node_nbrs, nnbrs, dist_scratch);
             if (stats != nullptr)
             {
@@ -1910,6 +1919,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
         // compute real-dist
         Timer compute_timer;
+        // preprocess the real embedding to match the format of  nomarlized version of diskann
         preprocess_fetched_embeddings(real_embeddings, metric, _max_base_norm, this->_data_dim);
 
         assert(real_embeddings.size() == full_retset.size());
