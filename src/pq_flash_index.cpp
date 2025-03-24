@@ -1554,19 +1554,53 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     uint8_t *pq_coord_scratch = pq_query_scratch->aligned_pq_coord_scratch;
 
     // lambda to batch compute query<-> node distances in PQ space
-    auto compute_dists = [this, pq_coord_scratch, pq_dists](const uint32_t *ids, const uint64_t n_ids,
+    auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T](const uint32_t *ids, const uint64_t n_ids,
                                                             float *dists_out) {
         // Vector[0], {3, 6, 2}
         // Distance = d[3][1] + d[6][2] + d[2][3]
-        bool recompute_beighbor_embeddings = false;
-        if (!recompute_beighbor_embeddings) {
+        bool recompute_beighbor_embeddings = true;
+        if (!recompute_beighbor_embeddings)
+        {
             diskann::aggregate_coords(ids, n_ids, this->data, this->_n_chunks, pq_coord_scratch);
             diskann::pq_dist_lookup(pq_coord_scratch, n_ids, this->_n_chunks, pq_dists, dists_out);
-        } else {
+        }
+        else
+        {
+            // Fetch the embeddings from the embedding server using n_ids
+            std::vector<uint32_t> node_ids(ids, ids + n_ids);
+            std::vector<std::vector<float>> embeddings;
 
-            //TODO: fecth the embeddings from the embedding server @yichuan finish here
-            diskann::aggregate_coords(ids, n_ids, this->data, this->_n_chunks, pq_coord_scratch);
-            diskann::pq_dist_lookup(pq_coord_scratch, n_ids, this->_n_chunks, pq_dists, dists_out);
+            // Fetch embeddings from the embedding server
+            bool success = fetch_embeddings_http(node_ids, embeddings);
+
+            if (!success || embeddings.size() != n_ids)
+            {
+                diskann::cout << "Failed to fetch embeddings from the embedding server" << std::endl;
+                // Fallback to PQ-based distance computation if fetching fails
+                diskann::aggregate_coords(ids, n_ids, this->data, this->_n_chunks, pq_coord_scratch);
+                diskann::pq_dist_lookup(pq_coord_scratch, n_ids, this->_n_chunks, pq_dists, dists_out);
+                return;
+            }
+
+            // Preprocess the fetched embeddings to match the format used in diskann
+            preprocess_fetched_embeddings(embeddings, this->metric, this->_max_base_norm, this->_data_dim);
+
+            // Compute distances using the embeddings
+            T temp_buf[this->_aligned_dim];
+            for (size_t i = 0; i < n_ids; i++)
+            {
+                // Ensure embedding has correct size
+                embeddings[i].resize(this->_aligned_dim, 0);
+                // Copy embedding to temporary buffer for distance computation
+                for (size_t j = 0; j < this->_aligned_dim; j++)
+                {
+                    temp_buf[j] = static_cast<T>(embeddings[i][j]);
+                }
+
+                // Compute distance between query and embedding
+                dists_out[i] = this->_dist_cmp->compare(aligned_query_T, temp_buf,
+                                                        static_cast<uint32_t>(this->_aligned_dim));
+            }
         }
     };
     Timer query_timer, io_timer, cpu_timer;
@@ -1925,7 +1959,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         assert(real_embeddings.size() == full_retset.size());
         assert(real_embeddings.size() == exact_dist_retset.size());
         assert(real_embeddings.size() == exact_embeddings.size());
-
+        // can add openmp to potimize the compute of query and embeddings
         for (int i = 0; i < real_embeddings.size(); i++)
         {
             // padding real_embeddings[i] to _aligned_dim
