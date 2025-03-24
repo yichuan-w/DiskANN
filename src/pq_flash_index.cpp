@@ -1256,11 +1256,6 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
 #else
     diskann::cout << "Loading index metadata from " << _disk_index_file << std::endl;
     std::ifstream index_metadata(_disk_index_file, std::ios::binary);
-    if (!index_metadata.is_open())
-    {
-        diskann::cout << "Error: Could not open index metadata file: " << _disk_index_file << std::endl;
-        return -1;
-    }
 #endif
 
     size_t medoid_id_on_file;
@@ -1268,6 +1263,12 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
     if (!_use_partition)
     {
 #endif
+        if (!index_metadata.is_open())
+        {
+            diskann::cout << "Error: Could not open index metadata file: " << _disk_index_file << std::endl;
+            return -1;
+        }
+
         uint32_t nr, nc; // metadata itself is stored as bin format (nr is number of
                          // metadata, nc should be 1)
         READ_U32(index_metadata, nr);
@@ -1330,28 +1331,29 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
         diskann::cout << "# nodes per sector: " << _nnodes_per_sector;
         diskann::cout << ", max node len (bytes): " << _max_node_len;
         diskann::cout << ", max node degree: " << _max_degree << std::endl;
-#ifdef NDEBUG
-    }
-#endif
 
 #ifdef EXEC_ENV_OLS
-    delete[] bytes;
+        delete[] bytes;
 #else
     index_metadata.close();
 #endif
 
 #ifndef EXEC_ENV_OLS
-    // open AlignedFileReader handle to index_file
-    std::string index_fname(_disk_index_file);
-    reader->open(index_fname);
+        // open AlignedFileReader handle to index_file
+        std::string index_fname(_disk_index_file);
+        reader->open(index_fname);
 
-    diskann::cout << "Disk-Index Meta: nodes per sector: " << _nnodes_per_sector << ", max node len: " << _max_node_len
-                  << ", max node degree: " << _max_degree << std::endl;
+        diskann::cout << "Disk-Index Meta: nodes per sector: " << _nnodes_per_sector
+                      << ", max node len: " << _max_node_len << ", max node degree: " << _max_degree << std::endl;
+
+#endif
+
+#ifdef NDEBUG
+    }
+#endif
 
     this->setup_thread_data(num_threads);
     this->_max_nthreads = num_threads;
-
-#endif
 
 #ifdef EXEC_ENV_OLS
     if (files.fileExists(medoids_file))
@@ -1905,6 +1907,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         std::vector<AlignedRead> graph_read_reqs;
         std::map<uint32_t, int> node_offsets; // id -> offset
         std::map<uint32_t, std::vector<uint32_t>> node_nbrs_ori;
+        std::map<uint32_t, std::vector<float>> node_cords;
 
         // read nhoods of frontier ids
         if (!frontier.empty())
@@ -1997,6 +2000,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                 uint32_t *nhood_buf = offset_to_node_nhood(node_disk_buf);
                 uint32_t neighbor_count = *nhood_buf;
                 node_nbrs_ori[node_id] = std::vector<uint32_t>(nhood_buf + 1, nhood_buf + 1 + neighbor_count);
+                node_cords[node_id] =
+                    std::vector<float>(offset_to_node_coords(node_disk_buf),
+                                       offset_to_node_coords(node_disk_buf) + _disk_bytes_per_point / sizeof(float));
             }
 #endif
             if (_use_partition)
@@ -2123,7 +2129,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             }
             else
             {
-                T *node_fp_coords = offset_to_node_coords(node_disk_buf);
+                // ! As for DEBUG mode and partition_read = True, we are overriding the node_disk_buf
+                // ! with our graph-structure only reading. So we need to use node_cords to get the correct
+                // ! coordinates.
+                T *node_fp_coords = reinterpret_cast<T *>(node_cords[node_id].data());
+                // T *node_fp_coords = offset_to_node_coords(node_disk_buf);
                 memcpy(data_buf, node_fp_coords, _disk_bytes_per_point);
                 if (!_use_disk_index_pq)
                 {
