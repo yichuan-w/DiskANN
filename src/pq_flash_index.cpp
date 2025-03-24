@@ -222,11 +222,15 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
         }
         aligned_free(buf);
 
+        if (!_use_partition)
+        {
+            // done with the normal path
+            return retval;
+        }
 #ifdef NDEBUG
-        // done with the normal path
-        return retval;
     }
 #endif
+
     {
         // 计算每个节点的分区偏移
         std::vector<std::pair<uint64_t, uint64_t>> offsets(node_ids.size());
@@ -887,7 +891,7 @@ int PQFlashIndex<T, LabelT>::load(uint32_t num_threads, const char *index_prefix
     {
         pq_prefix = index_prefix;
     }
-    if (partition_prefix == nullptr || strcmp(partition_prefix, "") == 0)
+    if (partition_prefix != nullptr && strcmp(partition_prefix, "") != 0)
     {
         _use_partition = true;
     }
@@ -982,13 +986,13 @@ int PQFlashIndex<T, LabelT>::load_graph_index(const std::string &graph_index_fil
 
 #ifndef NDEBUG
     assert(max_node_len == _max_node_len);
-    assert(dim_size * sizeof(float) == _disk_bytes_per_point); // ! Assume float here
-    assert(_graph_node_len == _max_degree + 1);
+    assert(dim_size == _disk_bytes_per_point);
+    assert(_graph_node_len / sizeof(float) == _max_degree + 1);
 #endif
 
     // Compensate the losting info from old meta_info
-    _max_degree = _graph_node_len - 1;
-    _disk_bytes_per_point = dim_size * sizeof(float);
+    _max_degree = _graph_node_len / sizeof(float) - 1;
+    _disk_bytes_per_point = dim_size;
     _max_node_len = max_node_len;
 
     diskann::cout << " => graph_node_len= " << _graph_node_len << "\n\n";
@@ -1262,8 +1266,8 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
     size_t medoid_id_on_file;
 #ifdef NDEBUG
     if (!_use_partition)
-#endif
     {
+#endif
         uint32_t nr, nc; // metadata itself is stored as bin format (nr is number of
                          // metadata, nc should be 1)
         READ_U32(index_metadata, nr);
@@ -1439,7 +1443,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
     {
         read_partition_info(partition_file);
 
-        this->_graph_index_file = partition_file;
+        this->_graph_index_file = graph_file;
         graph_reader->open(this->_graph_index_file);
         load_graph_index(this->_graph_index_file);
     }
