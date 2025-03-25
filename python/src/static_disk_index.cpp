@@ -19,7 +19,8 @@ StaticDiskIndex<DT>::StaticDiskIndex(const diskann::Metric metric, const std::st
     std::cout << "Before index load" << std::endl;
 
     const uint32_t _num_threads = num_threads != 0 ? num_threads : omp_get_num_procs();
-    int load_success = _index.load(_num_threads, index_path_prefix.c_str(), pq_prefix.c_str(), partition_prefix.c_str());
+    int load_success =
+        _index.load(_num_threads, index_path_prefix.c_str(), pq_prefix.c_str(), partition_prefix.c_str());
     if (load_success != 0)
     {
         throw std::runtime_error("index load failed, " + index_path_prefix);
@@ -93,8 +94,8 @@ NeighborsAndDistances<StaticIdType> StaticDiskIndex<DT>::batch_search(
 
     std::vector<uint64_t> u64_ids(knn * num_queries);
 
-#pragma omp parallel for schedule(dynamic, 1) default(none)                                                            \
-    shared(num_queries, queries, knn, complexity, u64_ids, dists, beam_width, USE_DEFERRED_FETCH, skip_search_reorder)
+    // #pragma omp parallel for schedule(dynamic, 1) default(none)                                                            \
+    // shared(num_queries, queries, knn, complexity, u64_ids, dists, beam_width, USE_DEFERRED_FETCH, skip_search_reorder)
     for (int64_t i = 0; i < (int64_t)num_queries; i++)
     {
         _index.cached_beam_search(queries.data(i), knn, complexity, u64_ids.data() + i * knn, dists.mutable_data(i),

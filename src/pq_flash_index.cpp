@@ -170,7 +170,7 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
     auto this_thread_data = manager.scratch_space();
     IOContext &ctx = this_thread_data->ctx;
 
-#ifdef NDEBUG
+#if 1
     // -- If not partition_read, this is the normal DiskANN approach:
     if (!_use_partition)
     {
@@ -227,7 +227,7 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
             // done with the normal path
             return retval;
         }
-#ifdef NDEBUG
+#if 1
     }
 #endif
 
@@ -915,9 +915,10 @@ int PQFlashIndex<T, LabelT>::read_partition_info(const std::string &partition_bi
     std::ifstream pf(partition_bin, std::ios::binary);
     if (!pf.is_open())
     {
-        std::cerr << "Cannot open partition.bin: " << partition_bin << std::endl;
+        diskann::cout << "Cannot open partition.bin: " << partition_bin << std::endl;
         return 1;
     }
+    diskann::cout << "Loading partition info from " << partition_bin << std::endl;
     uint64_t C, nd;
     READ_U64(pf, C);
     READ_U64(pf, _num_partitions);
@@ -952,6 +953,8 @@ int PQFlashIndex<T, LabelT>::load_graph_index(const std::string &graph_index_fil
         diskann::cout << "Cannot open disk_graph.index: " << graph_index_file << std::endl;
         return 1;
     }
+    diskann::cout << "Loading graph index from " << graph_index_file << std::endl;
+
     // (a) sector0 => read 2 ints for meta_n and meta_dim
     int meta_n, meta_dim;
     gf.read((char *)&meta_n, sizeof(int));
@@ -984,7 +987,7 @@ int PQFlashIndex<T, LabelT>::load_graph_index(const std::string &graph_index_fil
 
     _graph_node_len = max_node_len - dim_size;
 
-#ifndef NDEBUG
+#if 0
     assert(max_node_len == _max_node_len);
     assert(dim_size == _disk_bytes_per_point);
     assert(_graph_node_len / sizeof(float) == _max_degree + 1);
@@ -1259,7 +1262,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
 #endif
 
     size_t medoid_id_on_file;
-#ifdef NDEBUG
+#if 1
     if (!_use_partition)
     {
 #endif
@@ -1348,7 +1351,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
 
 #endif
 
-#ifdef NDEBUG
+#if 1
     }
 #endif
 
@@ -1809,7 +1812,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     std::vector<Neighbor> &full_retset = query_scratch->full_retset;
     std::vector<T *> points_to_compute; // Store points for later embedding computation
 
-#ifndef NDEBUG
+#if 0
     std::vector<Neighbor> exact_dist_retset;
     std::vector<std::vector<float>> exact_embeddings;
 #endif
@@ -1915,30 +1918,30 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             if (stats != nullptr)
                 stats->n_hops++;
 
-#ifdef NDEBUG
-            if (!_use_partition)
+            for (uint64_t i = 0; i < frontier.size(); i++)
             {
-#endif
-                for (uint64_t i = 0; i < frontier.size(); i++)
+                auto id = frontier[i];
+                std::pair<uint32_t, char *> fnhood;
+                fnhood.first = id;
+                fnhood.second = sector_scratch + num_sectors_per_node * sector_scratch_idx * defaults::SECTOR_LEN;
+                sector_scratch_idx++;
+                frontier_nhoods.push_back(fnhood);
+#if 1
+                if (!_use_partition)
                 {
-                    auto id = frontier[i];
-                    std::pair<uint32_t, char *> fnhood;
-                    fnhood.first = id;
-                    fnhood.second = sector_scratch + num_sectors_per_node * sector_scratch_idx * defaults::SECTOR_LEN;
-                    sector_scratch_idx++;
-                    frontier_nhoods.push_back(fnhood);
+#endif
                     frontier_read_reqs.emplace_back(get_node_sector((size_t)id) * defaults::SECTOR_LEN,
                                                     num_sectors_per_node * defaults::SECTOR_LEN, fnhood.second);
-                    if (stats != nullptr)
-                    {
-                        stats->n_4k++;
-                        stats->n_ios++;
-                    }
-                    num_ios++;
+#if 1
                 }
-#ifdef NDEBUG
-            }
 #endif
+                if (stats != nullptr)
+                {
+                    stats->n_4k++;
+                    stats->n_ios++;
+                }
+                num_ios++;
+            }
 
             if (_use_partition)
             {
@@ -1979,7 +1982,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             }
 
             io_timer.reset();
-#ifdef NDEBUG
+#if 1
             if (_use_partition)
             {
 #endif
@@ -1989,11 +1992,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 #else
             reader->read(frontier_read_reqs, ctx); // synchronous IO linux
 #endif
-#ifdef NDEBUG
+#if 1
             }
 #endif
 
-#ifndef NDEBUG
+#if 0
             for (auto &[node_id, disk_buf] : frontier_nhoods)
             {
                 char *node_disk_buf = offset_to_node(disk_buf, node_id);
@@ -2048,7 +2051,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             }
             full_retset.push_back(Neighbor(node_id, cur_expanded_dist));
 
-#ifndef NDEBUG
+#if 0
             if (!_use_disk_index_pq)
             {
                 exact_expanded_dist = _dist_cmp->compare(aligned_query_T, node_fp_coords_copy, (uint32_t)_aligned_dim);
@@ -2149,7 +2152,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             }
             full_retset.push_back(Neighbor(node_id, cur_expanded_dist));
 
-#ifndef NDEBUG
+#if 0
             T *node_fp_coords = offset_to_node_coords(node_disk_buf);
             memcpy(data_buf, node_fp_coords, _disk_bytes_per_point);
             float exact_expanded_dist = 0;
@@ -2178,7 +2181,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                 node_nbrs = (node_buf + 1);
             }
 
-#ifndef NDEBUG
+#if 0
             auto node_nbrs_vec = node_nbrs_ori[node_id];
             nnbrs = node_nbrs_vec.size();
             node_nbrs = node_nbrs_vec.data();
@@ -2213,7 +2216,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                     assert(false);
                 }
 
-#ifndef NDEBUG
+#if 0
                 if (neighbor_count != nnbrs)
                 {
                     diskann::cout << "Warning: neighbor_count != nnbrs: " << neighbor_count << " != " << nnbrs
@@ -2224,7 +2227,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
                 nnbrs = neighbor_count;
 
-#ifndef NDEBUG
+#if 0
                 uint32_t *our_node_nbrs = (uint32_t *)(adjacency_ptr + 4);
                 for (uint32_t i = 0; i < nnbrs; i++)
                 {
@@ -2313,15 +2316,17 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         Timer compute_timer;
         preprocess_fetched_embeddings(real_embeddings, metric, _max_base_norm, this->_data_dim);
 
+#if 0
         assert(real_embeddings.size() == full_retset.size());
         assert(real_embeddings.size() == exact_dist_retset.size());
         assert(real_embeddings.size() == exact_embeddings.size());
+#endif
 
         for (int i = 0; i < real_embeddings.size(); i++)
         {
             // padding real_embeddings[i] to _aligned_dim
             real_embeddings[i].resize(_aligned_dim, 0);
-#ifndef NDEBUG
+#if 0
             // compare real_embeddings[i] with exact_embeddings[i]
             if (real_embeddings[0].size() != exact_embeddings[0].size())
             {
@@ -2364,7 +2369,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
             full_retset[i].distance = dist;
 
-#ifndef NDEBUG
+#if 0
             if (abs(dist - exact_dist_retset[i].distance) > 5e-4)
             {
                 diskann::cout << "Difference found at node_id: " << full_retset[i].id << std::endl;
@@ -2380,7 +2385,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     std::sort(full_retset.begin(), full_retset.end());
 
 // Compare PQ results with exact results when skip_search_reorder is true
-#ifndef NDEBUG
+#if 0
     if (skip_search_reorder)
     {
         // Sort the exact distance results

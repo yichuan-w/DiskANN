@@ -9,40 +9,68 @@
 AppleAlignedFileReader::AppleAlignedFileReader()
 {
     this->file_desc = -1;
+    diskann::cout << "AppleAlignedFileReader created, this=" << this << std::endl;
 }
 
 AppleAlignedFileReader::~AppleAlignedFileReader()
 {
-    int64_t ret;
-    // check to make sure file_desc is closed
-    ret = ::fcntl(this->file_desc, F_GETFD);
-    if (ret == -1)
+    diskann::cout << "AppleAlignedFileReader destructor called, this=" << this << std::endl;
+
+    // 先解注册所有线程
+    deregister_all_threads();
+
+    // 关闭文件描述符
+    if (this->file_desc >= 0)
     {
-        if (errno != EBADF)
-        {
-            std::cerr << "close() not called" << std::endl;
-            // close file desc
-            ret = ::close(this->file_desc);
-            // error checks
-            if (ret == -1)
-            {
-                std::cerr << "close() failed; returned " << ret << ", errno=" << errno << ":" << ::strerror(errno)
-                          << std::endl;
-            }
-        }
+        diskann::cout << "Closing file in destructor, fd=" << this->file_desc << std::endl;
+        ::close(this->file_desc);
+        this->file_desc = -1;
     }
 }
 
 IOContext &AppleAlignedFileReader::get_ctx()
 {
-    std::unique_lock<std::mutex> lk(this->ctx_mut);
-    // perform checks only in DEBUG mode
-    if (ctx_map.find(std::this_thread::get_id()) == ctx_map.end())
+    auto thread_id = std::this_thread::get_id();
+
+    // 创建一个静态空上下文用于错误情况
+    static IOContext empty_ctx;
+    static bool initialized = false;
+
+    if (!initialized)
     {
-        std::cerr << "bad thread access; returning -1 as io_context_t" << std::endl;
-        throw;
+        empty_ctx.queue = nullptr;
+        empty_ctx.grp = nullptr;
+        empty_ctx.channel = nullptr;
+        initialized = true;
     }
-    IOContext &ctx = ctx_map[std::this_thread::get_id()];
+
+    std::unique_lock<std::mutex> lk(this->ctx_mut);
+
+    // 如果线程未注册，自动注册它
+    if (ctx_map.find(thread_id) == ctx_map.end())
+    {
+        lk.unlock();
+        diskann::cerr << "Thread " << thread_id << " not registered, auto-registering" << std::endl;
+
+        // 自动注册线程
+        if (this->file_desc >= 0)
+        {
+            this->register_thread();
+
+            // 再次检查是否注册成功
+            lk.lock();
+            if (ctx_map.find(thread_id) != ctx_map.end())
+            {
+                return ctx_map[thread_id];
+            }
+            lk.unlock();
+        }
+
+        return empty_ctx;
+    }
+
+    // 如果已注册，直接返回上下文
+    IOContext &ctx = ctx_map[thread_id];
     lk.unlock();
     return ctx;
 }
@@ -50,129 +78,306 @@ IOContext &AppleAlignedFileReader::get_ctx()
 void AppleAlignedFileReader::register_thread()
 {
     auto current_id = std::this_thread::get_id();
-    std::unique_lock<std::mutex> lk(ctx_mut);
-    if (ctx_map.find(current_id) != ctx_map.end())
+    diskann::cout << "register_thread called from thread " << current_id << " on instance " << this << std::endl;
+
+    // 检查文件描述符是否有效
+    if (this->file_desc < 0)
     {
-        std::cerr << "multiple calls to register_thread from the same thread" << std::endl;
-        throw;
+        diskann::cerr << "Thread " << current_id << " - register_thread called with invalid file descriptor"
+                      << std::endl;
+        return;
     }
 
+    // 检查线程是否已注册
+    {
+        std::lock_guard<std::mutex> ctx_lock(this->ctx_mut);
+        if (ctx_map.find(current_id) != ctx_map.end())
+        {
+            diskann::cout << "Thread " << current_id << " already registered" << std::endl;
+            return;
+        }
+    }
+
+    // 创建线程上下文
     IOContext ctx;
-    auto x = *static_cast<unsigned int *>(static_cast<void *>(&current_id));
-    ctx.queue = dispatch_queue_create(std::to_string(x).c_str(), DISPATCH_QUEUE_SERIAL);
+    ctx.queue = nullptr;
+    ctx.grp = nullptr;
+    ctx.channel = nullptr;
+
+    std::string queue_name =
+        "diskann_io_" + std::to_string(*static_cast<unsigned int *>(static_cast<void *>(&current_id)));
+    ctx.queue = dispatch_queue_create(queue_name.c_str(), DISPATCH_QUEUE_SERIAL);
+    if (!ctx.queue)
+    {
+        diskann::cerr << "Failed to create queue for thread " << current_id << std::endl;
+        return;
+    }
+
     ctx.grp = dispatch_group_create();
-    ctx.channel = // the cleanup is handled by deregister_all_threads for
-                  // readability reasons
-        dispatch_io_create(DISPATCH_IO_RANDOM, this->file_desc, ctx.queue,
-                           ^(int error){
-                           });
-    if (ctx.channel == NULL)
-        throw;
-    this->ctx_map.insert(std::make_pair(std::this_thread::get_id(), ctx));
+    if (!ctx.grp)
+    {
+        diskann::cerr << "Failed to create group for thread " << current_id << std::endl;
+        dispatch_release(ctx.queue);
+        return;
+    }
+
+    // 复制文件描述符
+    int dup_fd = ::dup(this->file_desc);
+    if (dup_fd == -1)
+    {
+        diskann::cerr << "Failed to duplicate file descriptor: " << this->file_desc << ", errno=" << errno << std::endl;
+        dispatch_release(ctx.grp);
+        dispatch_release(ctx.queue);
+        return;
+    }
+
+    // 创建IO通道
+    ctx.channel = dispatch_io_create(DISPATCH_IO_RANDOM, dup_fd, ctx.queue, ^(int error) {
+      ::close(dup_fd);
+      diskann::cout << "IO channel cleanup called, closed fd=" << dup_fd << std::endl;
+    });
+
+    if (!ctx.channel)
+    {
+        diskann::cerr << "Failed to create IO channel for thread " << current_id << ", fd=" << dup_fd
+                      << ", errno=" << errno << std::endl;
+        ::close(dup_fd);
+        dispatch_release(ctx.grp);
+        dispatch_release(ctx.queue);
+        return;
+    }
+
+    // 设置IO通道参数
+    dispatch_io_set_low_water(ctx.channel, SECTOR_LEN);
+    dispatch_io_set_high_water(ctx.channel, SECTOR_LEN * 16);
+
+    // 添加到线程映射
+    {
+        std::lock_guard<std::mutex> ctx_lock(this->ctx_mut);
+        ctx_map[current_id] = ctx;
+    }
+
+    diskann::cout << "Thread " << current_id << " successfully registered with fd=" << dup_fd << std::endl;
 }
 
 void AppleAlignedFileReader::deregister_thread()
 {
     auto my_id = std::this_thread::get_id();
-    std::unique_lock<std::mutex> lk(ctx_mut);
-    assert(ctx_map.find(my_id) != ctx_map.end());
-    lk.unlock();
+    diskann::cout << "deregister_thread called from thread " << my_id << " on instance " << this << std::endl;
 
-    IOContext ctx = this->get_ctx();
+    IOContext ctx;
+    bool found = false;
 
-    dispatch_io_close(ctx.channel, DISPATCH_IO_STOP);
-    dispatch_release(ctx.channel);
-    dispatch_release(ctx.grp);
+    {
+        std::lock_guard<std::mutex> ctx_lock(this->ctx_mut);
+        if (ctx_map.find(my_id) != ctx_map.end())
+        {
+            ctx = ctx_map[my_id];
+            ctx_map.erase(my_id);
+            found = true;
+        }
+    }
 
-    lk.lock();
-    ctx_map.erase(my_id);
-    std::cerr << "returned ctx from thread-id:" << my_id << std::endl;
-    lk.unlock();
+    if (!found)
+    {
+        diskann::cerr << "Thread " << my_id << " not registered, cannot deregister" << std::endl;
+        return;
+    }
+
+    if (ctx.channel)
+    {
+        dispatch_io_close(ctx.channel, DISPATCH_IO_STOP);
+        dispatch_release(ctx.channel);
+    }
+
+    if (ctx.grp)
+    {
+        dispatch_release(ctx.grp);
+    }
+
+    if (ctx.queue)
+    {
+        dispatch_release(ctx.queue);
+    }
+
+    diskann::cout << "Thread " << my_id << " deregistered" << std::endl;
 }
 
 void AppleAlignedFileReader::deregister_all_threads()
 {
-    std::unique_lock<std::mutex> lk(ctx_mut);
-    for (auto x = ctx_map.begin(); x != ctx_map.end(); x++)
+    diskann::cout << "deregister_all_threads called on instance " << this << std::endl;
+
+    std::vector<IOContext> contexts;
+
     {
-        IOContext ctx = x.value();
-        dispatch_io_close(ctx.channel, DISPATCH_IO_STOP);
-        dispatch_release(ctx.channel);
-        dispatch_release(ctx.grp);
+        std::lock_guard<std::mutex> ctx_lock(this->ctx_mut);
+        diskann::cout << "Deregistering " << ctx_map.size() << " threads" << std::endl;
+        for (auto &pair : ctx_map)
+        {
+            contexts.push_back(pair.second);
+        }
+        ctx_map.clear();
     }
-    std::cerr << "apple aligned reader: cleared all queues and channels" << std::endl;
-    ctx_map.clear();
+
+    for (auto &ctx : contexts)
+    {
+        if (ctx.channel)
+        {
+            dispatch_io_close(ctx.channel, DISPATCH_IO_STOP);
+            dispatch_release(ctx.channel);
+        }
+
+        if (ctx.grp)
+        {
+            dispatch_release(ctx.grp);
+        }
+
+        if (ctx.queue)
+        {
+            dispatch_release(ctx.queue);
+        }
+    }
+
+    diskann::cout << "All threads deregistered" << std::endl;
 }
 
 void AppleAlignedFileReader::open(const std::string &fname)
 {
-    int flags = O_RDONLY;
-    this->file_desc = ::open(fname.c_str(), flags);
+    diskann::cout << "open called for file: " << fname << " on instance " << this << std::endl;
+
+    // 关闭已存在的文件
+    if (this->file_desc >= 0)
+    {
+        diskann::cout << "Closing existing file descriptor: " << this->file_desc << std::endl;
+        ::close(this->file_desc);
+        this->file_desc = -1;
+    }
+
+    // 清空所有线程上下文
+    deregister_all_threads();
+
+    // 打开新文件
+    this->file_desc = ::open(fname.c_str(), O_RDONLY);
     if (this->file_desc == -1)
     {
-        std::cerr << "Failed to open file in apple file reader" << std::endl;
-        throw;
+        diskann::cerr << "Failed to open file: " << fname << ", errno=" << errno << std::endl;
+        throw std::runtime_error("Failed to open file"); // 文件打开失败是致命错误
+    }
+
+    // 获取文件信息
+    struct stat file_info;
+    if (::fstat(this->file_desc, &file_info) == 0)
+    {
+        diskann::cout << "File opened successfully: " << fname << ", size: " << file_info.st_size
+                      << " bytes, fd=" << this->file_desc << std::endl;
+    }
+    else
+    {
+        diskann::cout << "File opened but couldn't get file info, fd=" << this->file_desc << std::endl;
     }
 }
 
 void AppleAlignedFileReader::close()
 {
-    ::close(this->file_desc);
+    diskann::cout << "close called on instance " << this << std::endl;
+
+    // 先清理线程上下文
+    deregister_all_threads();
+
+    // 关闭文件描述符
+    if (this->file_desc >= 0)
+    {
+        diskann::cout << "Closing file descriptor: " << this->file_desc << std::endl;
+        ::close(this->file_desc);
+        this->file_desc = -1;
+    }
 }
 
 void AppleAlignedFileReader::read(std::vector<AlignedRead> &read_reqs, IOContext &ctx, bool async)
 {
-    using namespace std::chrono_literals;
+    auto thread_id = std::this_thread::get_id();
+
+    // 如果通道无效，自动尝试注册线程
+    if (!ctx.channel && this->file_desc >= 0)
+    {
+        diskann::cout << "Auto-registering thread " << thread_id << " during read" << std::endl;
+        this->register_thread();
+        // 获取新的上下文
+        ctx = this->get_ctx();
+    }
+
+    // 安全检查
+    if (!ctx.channel || !ctx.queue || !ctx.grp)
+    {
+        diskann::cerr << "Invalid IO context in thread " << thread_id << std::endl;
+        return;
+    }
 
     dispatch_io_t channel = ctx.channel;
     dispatch_queue_t q = ctx.queue;
     dispatch_group_t group = ctx.grp;
 
-    // execute each request sequentially
+    // 处理所有读取请求
     uint64_t n_reqs = read_reqs.size();
-    uint64_t n_batches = ROUND_UP(n_reqs, MAX_IO_DEPTH) / MAX_IO_DEPTH;
-    for (uint64_t i = 0; i < n_batches; i++)
+    for (uint64_t i = 0; i < n_reqs; i++)
     {
-        // batch start/end
-        uint64_t batch_start = MAX_IO_DEPTH * i;
-        uint64_t batch_size = std::min((uint64_t)(n_reqs - batch_start), (uint64_t)MAX_IO_DEPTH);
+        AlignedRead &req = read_reqs[i];
 
-        // fill OVERLAPPED and issue them
-        for (uint64_t j = 0; j < batch_size; j++)
+        // 检查对齐
+        if (!IS_ALIGNED(req.buf, SECTOR_LEN) || !IS_ALIGNED(req.offset, SECTOR_LEN) || !IS_ALIGNED(req.len, SECTOR_LEN))
         {
-            AlignedRead &req = read_reqs[batch_start + j];
-            uint64_t offset = req.offset;
-            uint64_t nbytes = req.len;
-            char *read_buf = (char *)req.buf;
-            assert(IS_ALIGNED(read_buf, SECTOR_LEN));
-            assert(IS_ALIGNED(offset, SECTOR_LEN));
-            assert(IS_ALIGNED(nbytes, SECTOR_LEN));
+            diskann::cerr << "Thread " << thread_id << " - alignment error for request " << i << std::endl;
+            continue;
+        }
 
-            dispatch_group_enter(group);
-            dispatch_io_read(channel, offset, nbytes, q, ^(bool done, dispatch_data_t data, int error) {
-              if (error)
-              {
-                  diskann::cerr << "error " << error << " when reading"
-                                << "\n";
+        dispatch_group_enter(group);
+
+        dispatch_io_read(channel, req.offset, req.len, q, ^(bool done, dispatch_data_t data, int error) {
+          if (error)
+          {
+              diskann::cerr << "Thread " << thread_id << " read error: " << error << " when reading at offset "
+                            << req.offset << std::endl;
+              if (done)
                   dispatch_group_leave(group);
-                  return;
-              }
+              return;
+          }
 
-              if (data && done)
+          if (data)
+          {
+              size_t actual_size = dispatch_data_get_size(data);
+              if (actual_size > 0)
               {
-                  if (nbytes == dispatch_data_get_size(data))
+                  __block size_t total_copied = 0;
+                  dispatch_data_apply(data,
+                                      ^(dispatch_data_t region, size_t region_offset, const void *buffer, size_t size) {
+                                        if (region_offset + size <= req.len)
+                                        {
+                                            memcpy((char *)req.buf + region_offset, buffer, size);
+                                            total_copied += size;
+                                            return (bool)true;
+                                        }
+                                        diskann::cerr << "Buffer overflow: region_offset=" << region_offset
+                                                      << ", size=" << size << ", req.len=" << req.len << std::endl;
+                                        return (bool)false;
+                                      });
+
+                  if (total_copied != req.len && done)
                   {
-                      dispatch_data_apply(
-                          data, (dispatch_data_applier_t) ^ (dispatch_data_t region, size_t offset, const void *buffer,
-                                                             size_t size) { memcpy(read_buf, buffer, size); });
-                      dispatch_group_leave(group);
-                      return;
+                      diskann::cerr << "Warning: Only copied " << total_copied << " of " << req.len
+                                    << " requested bytes" << std::endl;
                   }
               }
-            });
-        }
-        dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
+          }
+
+          // 仅在完成时离开组
+          if (done)
+          {
+              dispatch_group_leave(group);
+          }
+        });
     }
+
+    dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
 }
 
 #endif
