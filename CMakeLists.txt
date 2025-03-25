@@ -121,21 +121,74 @@ if (MSVC)
         "${DISKANN_MSVC_PACKAGES}/intelopenmp.redist.win/runtimes/win-x64/native/libiomp5md.dll"
         "${DISKANN_MSVC_PACKAGES}/intelopenmp.redist.win/runtimes/win-x64/native/libiomp5md.pdb")
 elseif(APPLE)
-    execute_process(
-        COMMAND brew --prefix libomp
-        OUTPUT_VARIABLE LIBOMP_ROOT
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
+    # Check if we're building Python bindings
+    if(PYBIND)
+        # First look for PyTorch's OpenMP to avoid conflicts
+        execute_process(
+            COMMAND ${Python_EXECUTABLE} -c "import os; import torch; print(os.path.join(os.path.dirname(torch.__file__), 'lib', 'libomp.dylib'))"
+            RESULT_VARIABLE TORCH_PATH_RESULT
+            OUTPUT_VARIABLE TORCH_LIBOMP_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
 
-    set(OpenMP_ROOT "${LIBOMP_ROOT}")
-    find_package(OpenMP)
+        execute_process(
+            COMMAND brew --prefix libomp
+            OUTPUT_VARIABLE LIBOMP_ROOT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        
+        if(EXISTS "${TORCH_LIBOMP_PATH}")
+            message(STATUS "Found PyTorch's libomp: ${TORCH_LIBOMP_PATH}")
+            set(OpenMP_CXX_FLAGS "-Xclang -fopenmp")
+            set(OpenMP_C_FLAGS "-Xclang -fopenmp")
+            set(OpenMP_CXX_LIBRARIES "${TORCH_LIBOMP_PATH}")
+            set(OpenMP_C_LIBRARIES "${TORCH_LIBOMP_PATH}")
+            set(OpenMP_FOUND TRUE)
 
-    if (OPENMP_FOUND)
-        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-        link_libraries(OpenMP::OpenMP_CXX)
+            include_directories(${LIBOMP_ROOT}/include)
+            
+            # Set compiler flags and link libraries
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+            link_libraries("${TORCH_LIBOMP_PATH}")
+        else()
+            message(STATUS "No PyTorch's libomp found, falling back to normal OpenMP detection")
+            # Fallback to normal OpenMP detection
+            execute_process(
+                COMMAND brew --prefix libomp
+                OUTPUT_VARIABLE LIBOMP_ROOT
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+
+            set(OpenMP_ROOT "${LIBOMP_ROOT}")
+            find_package(OpenMP)
+            
+            if (OPENMP_FOUND)
+                set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+                set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+                link_libraries(OpenMP::OpenMP_CXX)
+            else()
+                message(FATAL_ERROR "No OpenMP support")
+            endif()
+        endif()
     else()
-        message(FATAL_ERROR "No OpenMP support")
+        # Regular OpenMP setup for non-Python builds
+        execute_process(
+            COMMAND brew --prefix libomp
+            OUTPUT_VARIABLE LIBOMP_ROOT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        set(OpenMP_ROOT "${LIBOMP_ROOT}")
+        find_package(OpenMP)
+        
+        if (OPENMP_FOUND)
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+            link_libraries(OpenMP::OpenMP_CXX)
+        else()
+            message(FATAL_ERROR "No OpenMP support")
+        endif()
     endif()
 else()
     find_package(OpenMP)
