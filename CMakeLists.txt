@@ -254,7 +254,6 @@ if (MSVC)
         "${DISKANN_MKL_LIB_PATH}/mkl_intel_ilp64.lib"
         "${DISKANN_MKL_LIB_PATH}/mkl_core.lib"
         "${DISKANN_MKL_LIB_PATH}/mkl_intel_thread.lib")
-    add_definitions(-DMKL_ILP64)
 elseif(APPLE)
     # no mkl on non-intel devices
     find_library(ACCELERATE_LIBRARY Accelerate)
@@ -304,7 +303,7 @@ else()
     include_directories(${MKL_INCLUDE_PATH})
 
     # compile flags and link libraries
-  add_compile_options(-m64 -Wl,--no-as-needed)
+    add_compile_options(-m64 -Wl,--no-as-needed)
     if (NOT PYBIND)
         link_libraries(mkl_intel_ilp64 mkl_intel_thread mkl_core iomp5 pthread m dl)
     else()
@@ -326,8 +325,6 @@ else()
             )
         endif()
     endif()
-
-    add_definitions(-DMKL_ILP64)
 endif()
 
 
