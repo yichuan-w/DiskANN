@@ -325,6 +325,8 @@ else()
             )
         endif()
     endif()
+
+    add_definitions(-DMKL_ILP64)
 endif()
 
 
@@ -335,8 +337,6 @@ endif()
 # is enabled.
 if(USE_TCMALLOC)
     if (MSVC)
-        # Adjust the paths to point to the fetched tcmalloc content
-
         set(TCMALLOC_LINK_LIBRARY "${tcmalloc_BINARY_DIR}/x64/Release-Patch/libtcmalloc_minimal.lib")
         set(TCMALLOC_WINDOWS_RUNTIME_FILES
             "${tcmalloc_BINARY_DIR}/x64/Release-Patch/libtcmalloc_minimal.dll"
@@ -354,41 +354,43 @@ if(USE_TCMALLOC)
 
         add_library(libtcmalloc_minimal_for_exe STATIC IMPORTED)
         add_library(libtcmalloc_minimal_for_dll STATIC IMPORTED)
-    # Tell CMake how to build the tcmalloc linker library from the submodule.
-    add_custom_target(build_libtcmalloc_minimal DEPENDS ${TCMALLOC_LINK_LIBRARY})
-    add_custom_command(OUTPUT ${TCMALLOC_LINK_LIBRARY}
-                        COMMAND ${CMAKE_VS_MSBUILD_COMMAND} gperftools.sln /m /nologo
-                            /t:libtcmalloc_minimal /p:Configuration="Release-Patch"
-                            /property:Platform="x64"
-                            /p:PlatformToolset=v${MSVC_TOOLSET_VERSION}
-                            /p:WindowsTargetPlatformVersion=${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}
-                        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/gperftools)
- 
-    add_library(libtcmalloc_minimal_for_exe STATIC IMPORTED)
-    add_library(libtcmalloc_minimal_for_dll STATIC IMPORTED)
+    elseif(APPLE) # ! Inherited from #474, not been adjusted for TCMalloc Removal
+        execute_process(
+            COMMAND brew --prefix gperftools
+            OUTPUT_VARIABLE GPERFTOOLS_PREFIX
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        set(DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS "-L${GPERFTOOLS_PREFIX}/lib -ltcmalloc")
+    else()
+        # Tell CMake how to build the tcmalloc linker library from the submodule.
+        add_custom_target(build_libtcmalloc_minimal DEPENDS ${TCMALLOC_LINK_LIBRARY})
+        add_custom_command(OUTPUT ${TCMALLOC_LINK_LIBRARY}
+                            COMMAND ${CMAKE_VS_MSBUILD_COMMAND} gperftools.sln /m /nologo
+                                /t:libtcmalloc_minimal /p:Configuration="Release-Patch"
+                                /property:Platform="x64"
+                                /p:PlatformToolset=v${MSVC_TOOLSET_VERSION}
+                                /p:WindowsTargetPlatformVersion=${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}
+                            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/gperftools)
+    
+        add_library(libtcmalloc_minimal_for_exe STATIC IMPORTED)
+        add_library(libtcmalloc_minimal_for_dll STATIC IMPORTED)
 
         set_target_properties(libtcmalloc_minimal_for_dll PROPERTIES
-                              IMPORTED_LOCATION "${TCMALLOC_LINK_LIBRARY}")
+                                IMPORTED_LOCATION "${TCMALLOC_LINK_LIBRARY}")
 
         set_target_properties(libtcmalloc_minimal_for_exe PROPERTIES
-                              IMPORTED_LOCATION "${TCMALLOC_LINK_LIBRARY}"
-                              INTERFACE_LINK_OPTIONS /INCLUDE:_tcmalloc)
+                                IMPORTED_LOCATION "${TCMALLOC_LINK_LIBRARY}"
+                                INTERFACE_LINK_OPTIONS /INCLUDE:_tcmalloc)
 
         # Ensure libtcmalloc_minimal is built before it's being used.
         add_dependencies(libtcmalloc_minimal_for_dll build_libtcmalloc_minimal)
         add_dependencies(libtcmalloc_minimal_for_exe build_libtcmalloc_minimal)
 
         set(DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS libtcmalloc_minimal_for_exe)
-elseif(APPLE)
-    execute_process(
-        COMMAND brew --prefix gperftools
-        OUTPUT_VARIABLE GPERFTOOLS_PREFIX
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    set(DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS "-L${GPERFTOOLS_PREFIX}/lib -ltcmalloc")
-elseif(NOT PYBIND AND NOT APPLE)
-    set(DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS "-ltcmalloc")
-endif()
+        if(NOT PYBIND) # Also Inherited from #474, not been adjusted for TCMalloc Removal
+            set(DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS "-ltcmalloc")
+        endif()
+    endif()
 
     if (DISKANN_RELEASE_UNUSED_TCMALLOC_MEMORY_AT_CHECKPOINTS)
         add_definitions(-DRELEASE_UNUSED_TCMALLOC_MEMORY_AT_CHECKPOINTS)
