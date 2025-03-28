@@ -1262,10 +1262,10 @@ template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t k_search, const uint64_t l_search,
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const bool use_reorder_data, QueryStats *stats,
-                                                 bool USE_DEFERRED_FETCH, bool skip_search_reorder)
+                                                 bool USE_DEFERRED_FETCH, bool skip_search_reorder, bool recompute_beighbor_embeddings)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, std::numeric_limits<uint32_t>::max(),
-                       use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder);
+                       use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings);
 }
 
 template <typename T, typename LabelT>
@@ -1273,22 +1273,22 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const bool use_filter, const LabelT &filter_label,
                                                  const bool use_reorder_data, QueryStats *stats,
-                                                 bool USE_DEFERRED_FETCH, bool skip_search_reorder)
+                                                 bool USE_DEFERRED_FETCH, bool skip_search_reorder, bool recompute_beighbor_embeddings)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, use_filter, filter_label,
                        std::numeric_limits<uint32_t>::max(), use_reorder_data, stats, USE_DEFERRED_FETCH,
-                       skip_search_reorder);
+                       skip_search_reorder, recompute_beighbor_embeddings);
 }
 
 template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t k_search, const uint64_t l_search,
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const uint32_t io_limit, const bool use_reorder_data,
-                                                 QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder)
+                                                 QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder, bool recompute_beighbor_embeddings)
 {
     LabelT dummy_filter = 0;
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, false, dummy_filter, io_limit,
-                       use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder);
+                       use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings);
 }
 
 // A helper callback for cURL
@@ -1467,7 +1467,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const bool use_filter, const LabelT &filter_label,
                                                  const uint32_t io_limit, const bool use_reorder_data,
-                                                 QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder)
+                                                 QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder, bool recompute_beighbor_embeddings)
 {
     // printf("cached_beam_search\n");
     // diskann::cout << "cached_beam_search" << std::endl;
@@ -1554,11 +1554,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     uint8_t *pq_coord_scratch = pq_query_scratch->aligned_pq_coord_scratch;
 
     // lambda to batch compute query<-> node distances in PQ space
-    auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T](const uint32_t *ids, const uint64_t n_ids,
+    auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T, recompute_beighbor_embeddings](const uint32_t *ids, const uint64_t n_ids,
                                                             float *dists_out) {
         // Vector[0], {3, 6, 2}
         // Distance = d[3][1] + d[6][2] + d[2][3]
-        bool recompute_beighbor_embeddings = true;
+        // recompute_beighbor_embeddings = true;
         if (!recompute_beighbor_embeddings)
         {
             diskann::aggregate_coords(ids, n_ids, this->data, this->_n_chunks, pq_coord_scratch);

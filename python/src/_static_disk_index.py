@@ -118,6 +118,7 @@ class StaticDiskIndex:
         beam_width: int = 2,
         USE_DEFERRED_FETCH: bool = False,
         skip_search_reorder: bool = False,
+        recompute_beighbor_embeddings: bool = False,
     ) -> QueryResponse:
         """
         Searches the index by a single query vector.
@@ -135,6 +136,7 @@ class StaticDiskIndex:
           Specifying 0 will optimize the beamwidth depending on the number of threads performing search, but will
           involve some tuning overhead.
         - **skip_search_reorder**: Whether to skip search reorder for diskann search.
+        - **recompute_beighbor_embeddings**: Whether to recompute the neighbor embeddings.
         """
         _query = _castable_dtype_or_raise(query, expected=self._vector_dtype)
         _assert(len(_query.shape) == 1, "query vector must be 1-d")
@@ -155,6 +157,7 @@ class StaticDiskIndex:
             beam_width=beam_width,
             USE_DEFERRED_FETCH=USE_DEFERRED_FETCH,
             skip_search_reorder=skip_search_reorder,
+            recompute_beighbor_embeddings=recompute_beighbor_embeddings,
         )
         return QueryResponse(identifiers=neighbors, distances=distances)
 
@@ -167,6 +170,7 @@ class StaticDiskIndex:
         beam_width: int = 2,
         USE_DEFERRED_FETCH: bool = False,
         skip_search_reorder: bool = False,
+        recompute_beighbor_embeddings: bool = False,
     ) -> QueryResponseBatch:
         """
         Searches the index by a batch of query vectors.
@@ -204,7 +208,7 @@ class StaticDiskIndex:
 
         num_queries, dim = _queries.shape
         print(
-            f"USE_DEFERRED_FETCH={USE_DEFERRED_FETCH} skip_search_reorder={skip_search_reorder}"
+            f"USE_DEFERRED_FETCH={USE_DEFERRED_FETCH} skip_search_reorder={skip_search_reorder} recompute_beighbor_embeddings={recompute_beighbor_embeddings}"
         )
         neighbors, distances = self._index.batch_search(
             queries=_queries,
@@ -215,5 +219,6 @@ class StaticDiskIndex:
             num_threads=num_threads,
             USE_DEFERRED_FETCH=USE_DEFERRED_FETCH,
             skip_search_reorder=skip_search_reorder,
+            recompute_beighbor_embeddings=recompute_beighbor_embeddings,
         )
         return QueryResponseBatch(identifiers=neighbors, distances=distances)

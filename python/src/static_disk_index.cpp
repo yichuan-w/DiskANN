@@ -59,7 +59,7 @@ void StaticDiskIndex<DT>::cache_sample_paths(const size_t num_nodes_to_cache, co
 template <typename DT>
 NeighborsAndDistances<StaticIdType> StaticDiskIndex<DT>::search(
     py::array_t<DT, py::array::c_style | py::array::forcecast> &query, const uint64_t knn, const uint64_t complexity,
-    const uint64_t beam_width, const bool USE_DEFERRED_FETCH, const bool skip_search_reorder)
+    const uint64_t beam_width, const bool USE_DEFERRED_FETCH, const bool skip_search_reorder, const bool recompute_beighbor_embeddings)
 {
     py::array_t<StaticIdType> ids(knn);
     py::array_t<float> dists(knn);
@@ -69,7 +69,7 @@ NeighborsAndDistances<StaticIdType> StaticDiskIndex<DT>::search(
     diskann::QueryStats stats;
 
     _index.cached_beam_search(query.data(), knn, complexity, u64_ids.data(), dists.mutable_data(), beam_width, false,
-                              &stats, USE_DEFERRED_FETCH, skip_search_reorder);
+                              &stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings);
 
     auto r = ids.mutable_unchecked<1>();
     for (uint64_t i = 0; i < knn; ++i)
@@ -82,7 +82,7 @@ template <typename DT>
 NeighborsAndDistances<StaticIdType> StaticDiskIndex<DT>::batch_search(
     py::array_t<DT, py::array::c_style | py::array::forcecast> &queries, const uint64_t num_queries, const uint64_t knn,
     const uint64_t complexity, const uint64_t beam_width, const uint32_t num_threads, const bool USE_DEFERRED_FETCH,
-    const bool skip_search_reorder)
+    const bool skip_search_reorder, const bool recompute_beighbor_embeddings)
 {
     py::array_t<StaticIdType> ids({num_queries, knn});
     py::array_t<float> dists({num_queries, knn});
@@ -92,11 +92,11 @@ NeighborsAndDistances<StaticIdType> StaticDiskIndex<DT>::batch_search(
     std::vector<uint64_t> u64_ids(knn * num_queries);
 
 #pragma omp parallel for schedule(dynamic, 1) default(none)                                                            \
-    shared(num_queries, queries, knn, complexity, u64_ids, dists, beam_width, USE_DEFERRED_FETCH, skip_search_reorder)
+    shared(num_queries, queries, knn, complexity, u64_ids, dists, beam_width, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings)
     for (int64_t i = 0; i < (int64_t)num_queries; i++)
     {
         _index.cached_beam_search(queries.data(i), knn, complexity, u64_ids.data() + i * knn, dists.mutable_data(i),
-                                  beam_width, false, nullptr, USE_DEFERRED_FETCH, skip_search_reorder);
+                                  beam_width, false, nullptr, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings);
     }
 
     auto r = ids.mutable_unchecked();
