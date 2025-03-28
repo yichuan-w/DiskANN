@@ -1558,8 +1558,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     uint8_t *pq_coord_scratch = pq_query_scratch->aligned_pq_coord_scratch;
 
     // lambda to batch compute query<-> node distances in PQ space
-    auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T,
-                          recompute_beighbor_embeddings](const uint32_t *ids, const uint64_t n_ids, float *dists_out) {
+    auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T, recompute_beighbor_embeddings,
+                          data_buf](const uint32_t *ids, const uint64_t n_ids, float *dists_out) {
         // Vector[0], {3, 6, 2}
         // Distance = d[3][1] + d[6][2] + d[2][3]
         // recompute_beighbor_embeddings = true;
@@ -1590,20 +1590,17 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             preprocess_fetched_embeddings(embeddings, this->metric, this->_max_base_norm, this->_data_dim);
 
             // Compute distances using the embeddings
-            T temp_buf[this->_aligned_dim];
+            // T temp_buf[this->_aligned_dim];
             for (size_t i = 0; i < n_ids; i++)
             {
                 // Ensure embedding has correct size
                 embeddings[i].resize(this->_aligned_dim, 0);
                 // Copy embedding to temporary buffer for distance computation
-                for (size_t j = 0; j < this->_aligned_dim; j++)
-                {
-                    temp_buf[j] = static_cast<T>(embeddings[i][j]);
-                }
+                memcpy(data_buf, embeddings[i].data(), this->_aligned_dim * sizeof(T));
 
                 // Compute distance between query and embedding
                 dists_out[i] =
-                    this->_dist_cmp->compare(aligned_query_T, temp_buf, static_cast<uint32_t>(this->_aligned_dim));
+                    this->_dist_cmp->compare(aligned_query_T, data_buf, static_cast<uint32_t>(this->_aligned_dim));
             }
         }
     };
