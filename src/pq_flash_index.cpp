@@ -1262,7 +1262,8 @@ template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t k_search, const uint64_t l_search,
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const bool use_reorder_data, QueryStats *stats,
-                                                 bool USE_DEFERRED_FETCH, bool skip_search_reorder, bool recompute_beighbor_embeddings)
+                                                 bool USE_DEFERRED_FETCH, bool skip_search_reorder,
+                                                 bool recompute_beighbor_embeddings)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, std::numeric_limits<uint32_t>::max(),
                        use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings);
@@ -1273,7 +1274,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const bool use_filter, const LabelT &filter_label,
                                                  const bool use_reorder_data, QueryStats *stats,
-                                                 bool USE_DEFERRED_FETCH, bool skip_search_reorder, bool recompute_beighbor_embeddings)
+                                                 bool USE_DEFERRED_FETCH, bool skip_search_reorder,
+                                                 bool recompute_beighbor_embeddings)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, use_filter, filter_label,
                        std::numeric_limits<uint32_t>::max(), use_reorder_data, stats, USE_DEFERRED_FETCH,
@@ -1284,7 +1286,8 @@ template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t k_search, const uint64_t l_search,
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const uint32_t io_limit, const bool use_reorder_data,
-                                                 QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder, bool recompute_beighbor_embeddings)
+                                                 QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder,
+                                                 bool recompute_beighbor_embeddings)
 {
     LabelT dummy_filter = 0;
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, false, dummy_filter, io_limit,
@@ -1467,7 +1470,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const bool use_filter, const LabelT &filter_label,
                                                  const uint32_t io_limit, const bool use_reorder_data,
-                                                 QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder, bool recompute_beighbor_embeddings)
+                                                 QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder,
+                                                 bool recompute_beighbor_embeddings)
 {
     // printf("cached_beam_search\n");
     // diskann::cout << "cached_beam_search" << std::endl;
@@ -1554,8 +1558,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     uint8_t *pq_coord_scratch = pq_query_scratch->aligned_pq_coord_scratch;
 
     // lambda to batch compute query<-> node distances in PQ space
-    auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T, recompute_beighbor_embeddings](const uint32_t *ids, const uint64_t n_ids,
-                                                            float *dists_out) {
+    auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T,
+                          recompute_beighbor_embeddings](const uint32_t *ids, const uint64_t n_ids, float *dists_out) {
         // Vector[0], {3, 6, 2}
         // Distance = d[3][1] + d[6][2] + d[2][3]
         // recompute_beighbor_embeddings = true;
@@ -1598,8 +1602,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                 }
 
                 // Compute distance between query and embedding
-                dists_out[i] = this->_dist_cmp->compare(aligned_query_T, temp_buf,
-                                                        static_cast<uint32_t>(this->_aligned_dim));
+                dists_out[i] =
+                    this->_dist_cmp->compare(aligned_query_T, temp_buf, static_cast<uint32_t>(this->_aligned_dim));
             }
         }
     };
@@ -1880,7 +1884,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                     exact_expanded_dist = _disk_pq_table.l2_distance(query_float, (uint8_t *)data_buf);
             }
             exact_dist_retset.push_back(Neighbor(node_id, exact_expanded_dist));
-            exact_embeddings.push_back(std::vector<float>(data_buf, data_buf + _disk_bytes_per_point));
+            exact_embeddings.push_back(std::vector<float>(data_buf, data_buf + _aligned_dim));
 #endif
 
             uint32_t *node_nbrs = (node_buf + 1);
@@ -1966,28 +1970,28 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             real_embeddings[i].resize(_aligned_dim, 0);
 #ifndef NDEBUG
             // compare real_embeddings[i] with exact_embeddings[i]
-            if (real_embeddings[0].size() != exact_embeddings[0].size())
+            if (real_embeddings[i].size() != exact_embeddings[i].size())
             {
-                diskann::cout << "real_embeddings[0].size(): " << real_embeddings[0].size() << std::endl;
-                diskann::cout << "exact_embeddings[0].size(): " << exact_embeddings[0].size() << std::endl;
+                diskann::cout << "real_embeddings[i].size(): " << real_embeddings[i].size() << std::endl;
+                diskann::cout << "exact_embeddings[i].size(): " << exact_embeddings[i].size() << std::endl;
 
                 // dumping to files
                 std::ofstream diff_file("./diff_embeddings.txt");
-                diff_file << "real_embeddings[0].size(): " << real_embeddings[0].size() << std::endl;
-                diff_file << "exact_embeddings[0].size(): " << exact_embeddings[0].size() << std::endl;
-                for (int j = 0; j < real_embeddings[0].size(); j++)
+                diff_file << "real_embeddings[i].size(): " << real_embeddings[i].size() << std::endl;
+                diff_file << "exact_embeddings[i].size(): " << exact_embeddings[i].size() << std::endl;
+                for (int j = 0; j < real_embeddings[i].size(); j++)
                 {
                     diff_file << real_embeddings[i][j] << " ";
                 }
                 diff_file << std::endl;
-                for (int j = 0; j < exact_embeddings[0].size(); j++)
+                for (int j = 0; j < exact_embeddings[i].size(); j++)
                 {
                     diff_file << exact_embeddings[i][j] << " ";
                 }
                 diff_file << std::endl;
                 assert(false);
             }
-            for (int j = 0; j < real_embeddings[0].size(); j++)
+            for (int j = 0; j < real_embeddings[i].size(); j++)
             {
                 if (abs(real_embeddings[i][j] - exact_embeddings[i][j]) > 5e-4)
                 {
