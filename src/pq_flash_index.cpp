@@ -1604,6 +1604,53 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             }
         }
     };
+
+        // TODO: implement this function
+        // 1. Based on some heristic to prune the node_nbrs and nnbrs that is not promising
+        // 1.1 heruistic 1: use higher compression PQ to prune the node_nbrs and nnbrs that is not promising in path
+        // /powerrag/scaling_out/embeddings/facebook/contriever-msmarco/rpj_wiki/compressed_2/
+        // 1.2 heruistic 2: use a lightweight reranker to rerank the node_nbrs and nnbrs that is not promising
+        auto prune_node_nbrs = [](uint32_t *&node_nbrs, uint64_t &nnbrs) {
+            if (nnbrs <= 10)
+            {
+                // Don't prune if there are very few neighbors
+                return;
+            }
+            return;
+
+            // Create a vector of pairs (node_id, estimated_quality)
+            std::vector<std::pair<uint32_t, float>> scored_nbrs;
+            scored_nbrs.reserve(nnbrs);
+
+            // Use position in the original neighbor list as a quality heuristic
+            // Earlier neighbors are typically better quality
+            for (uint64_t i = 0; i < nnbrs; i++)
+            {
+                uint32_t nbr_id = node_nbrs[i];
+                float position_score = 1.0f - (float)i / nnbrs;
+                scored_nbrs.emplace_back(nbr_id, position_score);
+            }
+
+            // Sort by quality score (higher is better)
+            std::sort(scored_nbrs.begin(), scored_nbrs.end(),
+                        [](const std::pair<uint32_t, float> &a, const std::pair<uint32_t, float> &b) {
+                            return a.second > b.second;
+                        });
+
+            // Keep only the top 2/3 of neighbors
+            uint64_t new_nnbrs = std::max(10UL, (uint64_t)(nnbrs * 2 / 3));
+            if (new_nnbrs < nnbrs)
+            {
+                // Update the original node_nbrs array with pruned neighbors
+                for (uint64_t i = 0; i < new_nnbrs; i++)
+                {
+                    node_nbrs[i] = scored_nbrs[i].first;
+                }
+
+                // Update the count of neighbors
+                nnbrs = new_nnbrs;
+            }
+        };
     Timer query_timer, io_timer, cpu_timer;
 
     tsl::robin_set<uint64_t> &visited = query_scratch->visited;
@@ -1887,7 +1934,10 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             uint32_t *node_nbrs = (node_buf + 1);
             // compute node_nbrs <-> query dist in PQ space
             cpu_timer.reset();
+            // have a function to prune the node_nbrs and nnbrs
 
+
+            prune_node_nbrs(node_nbrs, nnbrs);
             compute_dists(node_nbrs, nnbrs, dist_scratch);
             if (stats != nullptr)
             {
