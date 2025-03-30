@@ -1263,10 +1263,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const bool use_reorder_data, QueryStats *stats,
                                                  bool USE_DEFERRED_FETCH, bool skip_search_reorder,
-                                                 bool recompute_beighbor_embeddings)
+                                                 bool recompute_beighbor_embeddings, bool dedup_node_dis)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, std::numeric_limits<uint32_t>::max(),
-                       use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings);
+                       use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings,
+                       dedup_node_dis);
 }
 
 template <typename T, typename LabelT>
@@ -1275,11 +1276,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const bool use_filter, const LabelT &filter_label,
                                                  const bool use_reorder_data, QueryStats *stats,
                                                  bool USE_DEFERRED_FETCH, bool skip_search_reorder,
-                                                 bool recompute_beighbor_embeddings)
+                                                 bool recompute_beighbor_embeddings, bool dedup_node_dis)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, use_filter, filter_label,
                        std::numeric_limits<uint32_t>::max(), use_reorder_data, stats, USE_DEFERRED_FETCH,
-                       skip_search_reorder, recompute_beighbor_embeddings);
+                       skip_search_reorder, recompute_beighbor_embeddings, dedup_node_dis);
 }
 
 template <typename T, typename LabelT>
@@ -1287,11 +1288,12 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  uint64_t *indices, float *distances, const uint64_t beam_width,
                                                  const uint32_t io_limit, const bool use_reorder_data,
                                                  QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder,
-                                                 bool recompute_beighbor_embeddings)
+                                                 bool recompute_beighbor_embeddings, bool dedup_node_dis)
 {
     LabelT dummy_filter = 0;
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, false, dummy_filter, io_limit,
-                       use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings);
+                       use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings,
+                       dedup_node_dis);
 }
 
 // A helper callback for cURL
@@ -1471,7 +1473,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const bool use_filter, const LabelT &filter_label,
                                                  const uint32_t io_limit, const bool use_reorder_data,
                                                  QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder,
-                                                 bool recompute_beighbor_embeddings)
+                                                 bool recompute_beighbor_embeddings, const bool dedup_node_dis)
 {
     // printf("cached_beam_search\n");
     // diskann::cout << "cached_beam_search" << std::endl;
@@ -1561,7 +1563,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
     // lambda to batch compute query<-> node distances in PQ space
     auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T, recompute_beighbor_embeddings, data_buf,
-                          &node_distances](const uint32_t *ids, const uint64_t n_ids, float *dists_out) {
+                          &node_distances,
+                          dedup_node_dis](const uint32_t *ids, const uint64_t n_ids, float *dists_out) {
         // Vector[0], {3, 6, 2}
         // Distance = d[3][1] + d[6][2] + d[2][3]
         // recompute_beighbor_embeddings = true;
@@ -1575,22 +1578,25 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             // Fetch the embeddings from the embedding server using n_ids
             std::vector<uint32_t> node_ids(ids, ids + n_ids);
             std::vector<uint32_t> pruned_node_ids;
-            for (size_t i = 0; i < n_ids; i++)
+            if (dedup_node_dis)
             {
-                if (node_distances.find(ids[i]) != node_distances.end())
+                for (size_t i = 0; i < n_ids; i++)
                 {
-                    continue;
+                    if (node_distances.find(ids[i]) != node_distances.end())
+                    {
+                        continue;
+                    }
+                    pruned_node_ids.push_back(ids[i]);
+                    dists_out[i] = node_distances[ids[i]];
                 }
-                pruned_node_ids.push_back(ids[i]);
-                dists_out[i] = node_distances[ids[i]];
+                // remove pruned_node_ids from node_ids
+                node_ids.erase(std::remove_if(node_ids.begin(), node_ids.end(),
+                                              [&pruned_node_ids](uint32_t id) {
+                                                  return std::find(pruned_node_ids.begin(), pruned_node_ids.end(),
+                                                                   id) != pruned_node_ids.end();
+                                              }),
+                               node_ids.end());
             }
-            // remove pruned_node_ids from node_ids
-            node_ids.erase(std::remove_if(node_ids.begin(), node_ids.end(),
-                                          [&pruned_node_ids](uint32_t id) {
-                                              return std::find(pruned_node_ids.begin(), pruned_node_ids.end(), id) !=
-                                                     pruned_node_ids.end();
-                                          }),
-                           node_ids.end());
 
             std::vector<std::vector<float>> embeddings;
 
@@ -1621,7 +1627,10 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                 // Compute distance between query and embedding
                 dists_out[i] =
                     this->_dist_cmp->compare(aligned_query_T, data_buf, static_cast<uint32_t>(this->_aligned_dim));
-                node_distances[ids[i]] = dists_out[i];
+                if (dedup_node_dis)
+                {
+                    node_distances[ids[i]] = dists_out[i];
+                }
             }
         }
     };

@@ -29,7 +29,8 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     DISKANN_DLLEXPORT ~PQFlashIndex();
 
 #ifdef EXEC_ENV_OLS
-    DISKANN_DLLEXPORT int load(diskann::MemoryMappedFiles &files, uint32_t num_threads, const char *index_prefix, const char *pq_prefix = nullptr);
+    DISKANN_DLLEXPORT int load(diskann::MemoryMappedFiles &files, uint32_t num_threads, const char *index_prefix,
+                               const char *pq_prefix = nullptr);
 #else
     // load compressed data, and obtains the handle to the disk-resident index
     DISKANN_DLLEXPORT int load(uint32_t num_threads, const char *index_prefix, const char *pq_prefix = nullptr);
@@ -66,7 +67,8 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
                                               const bool use_reorder_data = false, QueryStats *stats = nullptr,
                                               const bool USE_DEFERRED_FETCH = false,
                                               const bool skip_search_reorder = false,
-                                              const bool recompute_beighbor_embeddings = false);
+                                              const bool recompute_beighbor_embeddings = false,
+                                              const bool dedup_node_dis = false);
 
     DISKANN_DLLEXPORT void cached_beam_search(const T *query, const uint64_t k_search, const uint64_t l_search,
                                               uint64_t *res_ids, float *res_dists, const uint64_t beam_width,
@@ -74,22 +76,25 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
                                               const bool use_reorder_data = false, QueryStats *stats = nullptr,
                                               const bool USE_DEFERRED_FETCH = false,
                                               const bool skip_search_reorder = false,
-                                              const bool recompute_beighbor_embeddings = false);
+                                              const bool recompute_beighbor_embeddings = false,
+                                              const bool dedup_node_dis = false);
 
     DISKANN_DLLEXPORT void cached_beam_search(const T *query, const uint64_t k_search, const uint64_t l_search,
                                               uint64_t *res_ids, float *res_dists, const uint64_t beam_width,
                                               const uint32_t io_limit, const bool use_reorder_data = false,
                                               QueryStats *stats = nullptr, const bool USE_DEFERRED_FETCH = false,
                                               const bool skip_search_reorder = false,
-                                              const bool recompute_beighbor_embeddings = false);
+                                              const bool recompute_beighbor_embeddings = false,
+                                              const bool dedup_node_dis = false);
 
     DISKANN_DLLEXPORT void cached_beam_search(const T *query, const uint64_t k_search, const uint64_t l_search,
-        uint64_t *res_ids, float *res_dists, const uint64_t beam_width,
-        const bool use_filter, const LabelT &filter_label,
+                                              uint64_t *res_ids, float *res_dists, const uint64_t beam_width,
+                                              const bool use_filter, const LabelT &filter_label,
                                               const uint32_t io_limit, const bool use_reorder_data = false,
                                               QueryStats *stats = nullptr, const bool USE_DEFERRED_FETCH = false,
                                               const bool skip_search_reorder = false,
-                                              const bool recompute_beighbor_embeddings = false);
+                                              const bool recompute_beighbor_embeddings = false,
+                                              const bool dedup_node_dis = false);
 
     DISKANN_DLLEXPORT LabelT get_converted_label(const std::string &filter_label);
 
