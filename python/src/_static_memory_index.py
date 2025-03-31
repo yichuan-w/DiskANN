@@ -135,6 +135,7 @@ class StaticMemoryIndex:
         USE_DEFERRED_FETCH: bool = False,
         skip_search_reorder: bool = False,
         recompute_beighbor_embeddings: bool = False,
+        dedup_node_dis: bool = False,
     ) -> QueryResponse:
         """
         Searches the index by a single query vector.
@@ -182,6 +183,7 @@ class StaticMemoryIndex:
                 USE_DEFERRED_FETCH=USE_DEFERRED_FETCH,
                 skip_search_reorder=skip_search_reorder,
                 recompute_beighbor_embeddings=recompute_beighbor_embeddings,
+                dedup_node_dis=dedup_node_dis,
             )
         else:
             filter = self._labels_map[filter_label]
@@ -199,6 +201,7 @@ class StaticMemoryIndex:
         USE_DEFERRED_FETCH: bool = False,
         skip_search_reorder: bool = False,
         recompute_beighbor_embeddings: bool = False,
+        dedup_node_dis: bool = False,
     ) -> QueryResponseBatch:
         """
         Searches the index by a batch of query vectors.
@@ -242,5 +245,6 @@ class StaticMemoryIndex:
             USE_DEFERRED_FETCH=USE_DEFERRED_FETCH,
             skip_search_reorder=skip_search_reorder,
             recompute_beighbor_embeddings=recompute_beighbor_embeddings,
+            dedup_node_dis=dedup_node_dis,
         )
         return QueryResponseBatch(identifiers=neighbors, distances=distances)
