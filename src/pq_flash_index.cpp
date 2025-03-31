@@ -1498,6 +1498,10 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     float *query_float = pq_query_scratch->aligned_query_float;
     float *query_rotated = pq_query_scratch->rotated_query;
 
+    // Add cache hit tracking variables
+    uint64_t total_nodes_requested = 0;
+    uint64_t total_nodes_from_cache = 0;
+
     // normalization step. for cosine, we simply normalize the query
     // for mips, we normalize the first d-1 dims, and add a 0 for last dim, since an extra coordinate was used to
     // convert MIPS to L2 search
@@ -1563,8 +1567,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
     // Lambda to batch compute query<->node distances in PQ space
     auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T, recompute_beighbor_embeddings, data_buf,
-                        &node_distances,
-                        dedup_node_dis](const uint32_t *ids, const uint64_t n_ids, float *dists_out) {
+                          &node_distances, &total_nodes_requested, &total_nodes_from_cache,
+                          dedup_node_dis](const uint32_t *ids, const uint64_t n_ids, float *dists_out) {
         // Vector[0], {3, 6, 2}
         // Distance = d[3][1] + d[6][2] + d[2][3]
         // recompute_beighbor_embeddings = true;
@@ -1577,13 +1581,16 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         {
             // Fetch the embeddings from the embedding server using n_ids
             std::vector<uint32_t> node_ids(ids, ids + n_ids);
-            
+
+            // Update total nodes requested counter
+            total_nodes_requested += n_ids;
+
             // Handle deduplication if enabled
             if (dedup_node_dis)
             {
                 // Check for cached distances and record which nodes need computation
                 std::vector<uint32_t> nodes_to_compute;
-                
+
                 // First pass: use cached distances where available
                 for (size_t i = 0; i < n_ids; i++)
                 {
@@ -1591,6 +1598,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                     {
                         // Use cached distance
                         dists_out[i] = node_distances[ids[i]];
+                        total_nodes_from_cache++; // Count cache hits
                     }
                     else
                     {
@@ -1598,11 +1606,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                         nodes_to_compute.push_back(ids[i]);
                     }
                 }
-                
+
                 // If all distances are cached, we can return early
                 if (nodes_to_compute.empty())
                     return;
-                    
+
                 // Update node_ids to only include nodes that need computation
                 node_ids = nodes_to_compute;
             }
@@ -1628,26 +1636,27 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             {
                 // Build a map from node_id to original position for O(1) lookup
                 std::unordered_map<uint32_t, size_t> id_to_position;
-                for (size_t j = 0; j < n_ids; j++) {
+                for (size_t j = 0; j < n_ids; j++)
+                {
                     id_to_position[ids[j]] = j;
                 }
-                
+
                 // Process each node that needs computation
                 for (size_t i = 0; i < node_ids.size(); i++)
                 {
                     uint32_t node_id = node_ids[i];
-                    
+
                     // Get original position using the map (O(1) operation)
                     size_t orig_idx = id_to_position[node_id];
-                    
+
                     // Prepare embedding for distance computation
                     embeddings[i].resize(this->_aligned_dim, 0);
                     memcpy(data_buf, embeddings[i].data(), this->_aligned_dim * sizeof(T));
 
                     // Compute distance
-                    float distance = this->_dist_cmp->compare(aligned_query_T, data_buf, 
-                                                        static_cast<uint32_t>(this->_aligned_dim));
-                    
+                    float distance =
+                        this->_dist_cmp->compare(aligned_query_T, data_buf, static_cast<uint32_t>(this->_aligned_dim));
+
                     // Store results
                     dists_out[orig_idx] = distance;
                     node_distances[node_id] = distance;
@@ -1663,9 +1672,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                     memcpy(data_buf, embeddings[i].data(), this->_aligned_dim * sizeof(T));
 
                     // Compute distance
-                    float distance = this->_dist_cmp->compare(aligned_query_T, data_buf, 
-                                                        static_cast<uint32_t>(this->_aligned_dim));
-                    
+                    float distance =
+                        this->_dist_cmp->compare(aligned_query_T, data_buf, static_cast<uint32_t>(this->_aligned_dim));
+
                     // Store results
                     dists_out[i] = distance;
                     // node_distances[ids[i]] = distance;  // Uncomment if caching in non-dedup mode is desired
@@ -2271,6 +2280,16 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     if (stats != nullptr)
     {
         stats->total_us = (float)query_timer.elapsed();
+    }
+
+    // After search is complete, print cache hit rate statistics
+    if (recompute_beighbor_embeddings && dedup_node_dis && total_nodes_requested > 0)
+    {
+        float cache_hit_rate = static_cast<float>(total_nodes_from_cache) / total_nodes_requested * 100.0f;
+        diskann::cout << "Node distance cache statistics:" << std::endl;
+        diskann::cout << "  Total nodes requested: " << total_nodes_requested << std::endl;
+        diskann::cout << "  Nodes served from cache: " << total_nodes_from_cache << std::endl;
+        diskann::cout << "  Cache hit rate: " << cache_hit_rate << "%" << std::endl;
     }
 }
 
