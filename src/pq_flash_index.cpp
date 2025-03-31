@@ -1561,10 +1561,10 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
     std::map<int, float> node_distances;
 
-    // lambda to batch compute query<-> node distances in PQ space
+    // Lambda to batch compute query<->node distances in PQ space
     auto compute_dists = [this, pq_coord_scratch, pq_dists, aligned_query_T, recompute_beighbor_embeddings, data_buf,
-                          &node_distances,
-                          dedup_node_dis](const uint32_t *ids, const uint64_t n_ids, float *dists_out) {
+                        &node_distances,
+                        dedup_node_dis](const uint32_t *ids, const uint64_t n_ids, float *dists_out) {
         // Vector[0], {3, 6, 2}
         // Distance = d[3][1] + d[6][2] + d[2][3]
         // recompute_beighbor_embeddings = true;
@@ -1577,33 +1577,41 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         {
             // Fetch the embeddings from the embedding server using n_ids
             std::vector<uint32_t> node_ids(ids, ids + n_ids);
-            std::vector<uint32_t> pruned_node_ids;
+            
+            // Handle deduplication if enabled
             if (dedup_node_dis)
             {
+                // Check for cached distances and record which nodes need computation
+                std::vector<uint32_t> nodes_to_compute;
+                
+                // First pass: use cached distances where available
                 for (size_t i = 0; i < n_ids; i++)
                 {
                     if (node_distances.find(ids[i]) != node_distances.end())
                     {
-                        continue;
+                        // Use cached distance
+                        dists_out[i] = node_distances[ids[i]];
                     }
-                    pruned_node_ids.push_back(ids[i]);
-                    dists_out[i] = node_distances[ids[i]];
+                    else
+                    {
+                        // Not in cache, need to compute
+                        nodes_to_compute.push_back(ids[i]);
+                    }
                 }
-                // remove pruned_node_ids from node_ids
-                node_ids.erase(std::remove_if(node_ids.begin(), node_ids.end(),
-                                              [&pruned_node_ids](uint32_t id) {
-                                                  return std::find(pruned_node_ids.begin(), pruned_node_ids.end(),
-                                                                   id) != pruned_node_ids.end();
-                                              }),
-                               node_ids.end());
+                
+                // If all distances are cached, we can return early
+                if (nodes_to_compute.empty())
+                    return;
+                    
+                // Update node_ids to only include nodes that need computation
+                node_ids = nodes_to_compute;
             }
 
-            std::vector<std::vector<float>> embeddings;
-
             // Fetch embeddings from the embedding server
+            std::vector<std::vector<float>> embeddings;
             bool success = fetch_embeddings_http(node_ids, embeddings);
 
-            if (!success || embeddings.size() != n_ids)
+            if (!success || embeddings.size() != node_ids.size())
             {
                 diskann::cout << "Failed to fetch embeddings from the embedding server" << std::endl;
                 // Fallback to PQ-based distance computation if fetching fails
@@ -1615,21 +1623,52 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             // Preprocess the fetched embeddings to match the format used in diskann
             preprocess_fetched_embeddings(embeddings, this->metric, this->_max_base_norm, this->_data_dim);
 
-            // Compute distances using the embeddings
-            // T temp_buf[this->_aligned_dim];
-            for (size_t i = 0; i < n_ids; i++)
+            // Compute distances for fetched embeddings
+            if (dedup_node_dis)
             {
-                // Ensure embedding has correct size
-                embeddings[i].resize(this->_aligned_dim, 0);
-                // Copy embedding to temporary buffer for distance computation
-                memcpy(data_buf, embeddings[i].data(), this->_aligned_dim * sizeof(T));
-
-                // Compute distance between query and embedding
-                dists_out[i] =
-                    this->_dist_cmp->compare(aligned_query_T, data_buf, static_cast<uint32_t>(this->_aligned_dim));
-                if (dedup_node_dis)
+                // Build a map from node_id to original position for O(1) lookup
+                std::unordered_map<uint32_t, size_t> id_to_position;
+                for (size_t j = 0; j < n_ids; j++) {
+                    id_to_position[ids[j]] = j;
+                }
+                
+                // Process each node that needs computation
+                for (size_t i = 0; i < node_ids.size(); i++)
                 {
-                    node_distances[ids[i]] = dists_out[i];
+                    uint32_t node_id = node_ids[i];
+                    
+                    // Get original position using the map (O(1) operation)
+                    size_t orig_idx = id_to_position[node_id];
+                    
+                    // Prepare embedding for distance computation
+                    embeddings[i].resize(this->_aligned_dim, 0);
+                    memcpy(data_buf, embeddings[i].data(), this->_aligned_dim * sizeof(T));
+
+                    // Compute distance
+                    float distance = this->_dist_cmp->compare(aligned_query_T, data_buf, 
+                                                        static_cast<uint32_t>(this->_aligned_dim));
+                    
+                    // Store results
+                    dists_out[orig_idx] = distance;
+                    node_distances[node_id] = distance;
+                }
+            }
+            else
+            {
+                // Without deduplication, embeddings match the original order
+                for (size_t i = 0; i < n_ids; i++)
+                {
+                    // Prepare embedding for distance computation
+                    embeddings[i].resize(this->_aligned_dim, 0);
+                    memcpy(data_buf, embeddings[i].data(), this->_aligned_dim * sizeof(T));
+
+                    // Compute distance
+                    float distance = this->_dist_cmp->compare(aligned_query_T, data_buf, 
+                                                        static_cast<uint32_t>(this->_aligned_dim));
+                    
+                    // Store results
+                    dists_out[i] = distance;
+                    // node_distances[ids[i]] = distance;  // Uncomment if caching in non-dedup mode is desired
                 }
             }
         }
