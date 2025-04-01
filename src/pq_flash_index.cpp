@@ -2161,7 +2161,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
             io_timer.reset();
 #if 1
-            if (_use_partition)
+            if (!_use_partition)
             {
 #endif
 #ifdef USE_BING_INFRA
