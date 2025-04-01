@@ -1688,35 +1688,42 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     // 1.1 heruistic 1: use higher compression PQ to prune the node_nbrs and nnbrs that is not promising in path
     // /powerrag/scaling_out/embeddings/facebook/contriever-msmarco/rpj_wiki/compressed_2/
     // 1.2 heruistic 2: use a lightweight reranker to rerank the node_nbrs and nnbrs that is not promising
-    auto prune_node_nbrs = [](uint32_t *&node_nbrs, uint64_t &nnbrs) {
+    auto prune_node_nbrs = [this, pq_coord_scratch, pq_dists, recompute_beighbor_embeddings,
+                            dedup_node_dis](uint32_t *&node_nbrs, uint64_t &nnbrs, float prune_ratio = 0.5f) {
+        if (!recompute_beighbor_embeddings)
+        {
+            return;
+        }
         if (nnbrs <= 10)
         {
             // Don't prune if there are very few neighbors
             return;
         }
-        return;
 
-        // Create a vector of pairs (node_id, estimated_quality)
+        // Allocate space for distance calculations
+        float *dists_out = new float[nnbrs];
+
+        // Compute distances using PQ directly instead of compute_dists
+        diskann::aggregate_coords(node_nbrs, nnbrs, this->data, this->_n_chunks, pq_coord_scratch);
+        diskann::pq_dist_lookup(pq_coord_scratch, nnbrs, this->_n_chunks, pq_dists, dists_out);
+
+        // Create a vector of pairs (node_id, distance)
         std::vector<std::pair<uint32_t, float>> scored_nbrs;
         scored_nbrs.reserve(nnbrs);
 
-        // Use position in the original neighbor list as a quality heuristic
-        // Earlier neighbors are typically better quality
         for (uint64_t i = 0; i < nnbrs; i++)
         {
-            uint32_t nbr_id = node_nbrs[i];
-            float position_score = 1.0f - (float)i / nnbrs;
-            scored_nbrs.emplace_back(nbr_id, position_score);
+            scored_nbrs.emplace_back(node_nbrs[i], dists_out[i]);
         }
 
-        // Sort by quality score (higher is better)
+        // Sort by distance (lower is better)
         std::sort(scored_nbrs.begin(), scored_nbrs.end(),
                   [](const std::pair<uint32_t, float> &a, const std::pair<uint32_t, float> &b) {
-                      return a.second > b.second;
+                      return a.second < b.second;
                   });
 
-        // Keep only the top 2/3 of neighbors
-        uint64_t new_nnbrs = std::max(10UL, (uint64_t)(nnbrs * 2 / 3));
+        // Keep only the top portion of neighbors based on prune_ratio (or at least 10)
+        uint64_t new_nnbrs = std::max(10UL, (uint64_t)(nnbrs * prune_ratio));
         if (new_nnbrs < nnbrs)
         {
             // Update the original node_nbrs array with pruned neighbors
@@ -1728,6 +1735,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             // Update the count of neighbors
             nnbrs = new_nnbrs;
         }
+
+        // Free the allocated memory
+        delete[] dists_out;
     };
     Timer query_timer, io_timer, cpu_timer;
 
@@ -2014,7 +2024,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             cpu_timer.reset();
             // have a function to prune the node_nbrs and nnbrs
 
-            prune_node_nbrs(node_nbrs, nnbrs);
+            prune_node_nbrs(node_nbrs, nnbrs, 0.5f);
             compute_dists(node_nbrs, nnbrs, dist_scratch);
             if (stats != nullptr)
             {
