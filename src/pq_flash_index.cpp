@@ -2307,7 +2307,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             {
                 cur_expanded_dist = 0.0f;
             }
-            else if (recompute_beighbor_embeddings)
+            else if (recompute_beighbor_embeddings && dedup_node_dis)
             {
                 // ! Use node_distances to get the distance
                 cur_expanded_dist = node_distances[node_id];
