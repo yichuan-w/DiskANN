@@ -1920,7 +1920,6 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
                     // Store results
                     dists_out[i] = distance;
-                    // node_distances[ids[i]] = distance;  // Uncomment if caching in non-dedup mode is desired
                 }
             }
         }
@@ -2308,8 +2307,19 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             {
                 cur_expanded_dist = 0.0f;
             }
+            else if (recompute_beighbor_embeddings)
+            {
+                // ! Use node_distances to get the distance
+                cur_expanded_dist = node_distances[node_id];
+            }
             else
             {
+                if (node_cords.find(node_id) == node_cords.end())
+                {
+                    diskann::cout << "Warning: node " << node_id << " not found in node_cords" << std::endl;
+                    diskann::cout << "Are you using deferred fetch for detached graph?" << std::endl;
+                    assert(false);
+                }
                 // ! As for DEBUG mode and partition_read = True, we are overriding the node_disk_buf
                 // ! with our graph-structure only reading. So we need to use node_cords to get the correct
                 // ! coordinates.
