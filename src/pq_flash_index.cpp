@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <cmath>
 
 #include "timer.h"
 #include "pq.h"
@@ -1587,7 +1588,7 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
         zmq_setsockopt(s_socket, ZMQ_SNDTIMEO, &timeout, sizeof(timeout));
 
         // Connect to the server
-std::stringstream ss;
+        std::stringstream ss;
         ss << "tcp://127.0.0.1:" << zmq_port;
         if (zmq_connect(s_socket, ss.str().c_str()) != 0)
         {
@@ -1968,7 +1969,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                   });
 
         // Keep only the top portion of neighbors based on prune_ratio (or at least 10)
-        uint64_t new_nnbrs = std::max(10UL, (uint64_t)(nnbrs * prune_ratio));
+        uint64_t new_nnbrs = std::max<uint64_t>(10UL, static_cast<uint64_t>(nnbrs * prune_ratio));
         if (new_nnbrs < nnbrs)
         {
             // Update the original node_nbrs array with pruned neighbors

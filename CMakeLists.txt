@@ -22,6 +22,11 @@ project(diskann)
 #Set option to use tcmalloc
 option(USE_TCMALLOC "Use tcmalloc from gperftools" ON)
 
+# set tcmalloc to false when on macos
+if(APPLE)
+    set(USE_TCMALLOC OFF)
+endif()
+
 option(PYBIND "Build with Python bindings" ON)
 
 if(PYBIND)
