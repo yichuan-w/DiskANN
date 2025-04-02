@@ -1546,7 +1546,8 @@ static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *use
     return size * nmemb;
 }
 
-bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings)
+bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings,
+                          int zmq_port = 5555)
 {
     // (1) BUILD PROTO
     protoembedding::NodeEmbeddingRequest req_proto;
@@ -1586,7 +1587,9 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
         zmq_setsockopt(s_socket, ZMQ_SNDTIMEO, &timeout, sizeof(timeout));
 
         // Connect to the server
-        if (zmq_connect(s_socket, "tcp://127.0.0.1:5555") != 0)
+std::stringstream ss;
+        ss << "tcp://127.0.0.1:" << zmq_port;
+        if (zmq_connect(s_socket, ss.str().c_str()) != 0)
         {
             std::cerr << "zmq_connect failed: " << zmq_strerror(zmq_errno()) << "\n";
             zmq_close(s_socket);
