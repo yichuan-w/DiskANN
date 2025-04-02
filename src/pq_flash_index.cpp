@@ -2314,6 +2314,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             }
             else
             {
+#if 0
                 if (node_cords.find(node_id) == node_cords.end())
                 {
                     diskann::cout << "Warning: node " << node_id << " not found in node_cords" << std::endl;
@@ -2325,6 +2326,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                 // ! coordinates.
                 T *node_fp_coords = reinterpret_cast<T *>(node_cords[node_id].data());
                 // T *node_fp_coords = offset_to_node_coords(node_disk_buf);
+#endif
+                T *node_fp_coords = offset_to_node_coords(node_disk_buf);
                 memcpy(data_buf, node_fp_coords, _disk_bytes_per_point);
                 if (!_use_disk_index_pq)
                 {
