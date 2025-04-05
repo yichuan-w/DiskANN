@@ -1389,13 +1389,38 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
 
     // Process embeddings
     out_embeddings.clear();
-    out_embeddings.reserve(resp_proto.embeddings_size());
 
-    for (int i = 0; i < resp_proto.embeddings_size(); i++)
+    // 确保我们有维度信息
+    if (resp_proto.dimensions_size() != 2)
     {
-        const auto &embMsg = resp_proto.embeddings(i);
-        const auto &vals = embMsg.values();
-        out_embeddings.emplace_back(vals.begin(), vals.end());
+        std::cerr << "Invalid dimensions in response (expected 2 values).\n";
+        return false;
+    }
+
+    int batch_size = resp_proto.dimensions(0);
+    int embedding_dim = resp_proto.dimensions(1);
+
+    // 将二进制数据转换为向量
+    const char *data_ptr = resp_proto.embeddings_data().data();
+    size_t data_size = resp_proto.embeddings_data().size();
+
+    if (data_size != batch_size * embedding_dim * sizeof(float))
+    {
+        std::cerr << "Data size mismatch in response.\n";
+        return false;
+    }
+
+    const float *float_data = reinterpret_cast<const float *>(data_ptr);
+
+    // 创建输出向量
+    out_embeddings.resize(batch_size);
+    for (int i = 0; i < batch_size; i++)
+    {
+        out_embeddings[i].resize(embedding_dim);
+        for (int j = 0; j < embedding_dim; j++)
+        {
+            out_embeddings[i][j] = float_data[i * embedding_dim + j];
+        }
     }
 
     return true;

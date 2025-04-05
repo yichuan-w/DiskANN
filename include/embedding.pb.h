@@ -45,9 +45,6 @@ struct TableStruct_embedding_2eproto {
 };
 extern const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_embedding_2eproto;
 namespace protoembedding {
-class NodeEmbedding;
-struct NodeEmbeddingDefaultTypeInternal;
-extern NodeEmbeddingDefaultTypeInternal _NodeEmbedding_default_instance_;
 class NodeEmbeddingRequest;
 struct NodeEmbeddingRequestDefaultTypeInternal;
 extern NodeEmbeddingRequestDefaultTypeInternal _NodeEmbeddingRequest_default_instance_;
@@ -56,7 +53,6 @@ struct NodeEmbeddingResponseDefaultTypeInternal;
 extern NodeEmbeddingResponseDefaultTypeInternal _NodeEmbeddingResponse_default_instance_;
 }  // namespace protoembedding
 PROTOBUF_NAMESPACE_OPEN
-template<> ::protoembedding::NodeEmbedding* Arena::CreateMaybeMessage<::protoembedding::NodeEmbedding>(Arena*);
 template<> ::protoembedding::NodeEmbeddingRequest* Arena::CreateMaybeMessage<::protoembedding::NodeEmbeddingRequest>(Arena*);
 template<> ::protoembedding::NodeEmbeddingResponse* Arena::CreateMaybeMessage<::protoembedding::NodeEmbeddingResponse>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
@@ -226,167 +222,6 @@ class NodeEmbeddingRequest final :
 };
 // -------------------------------------------------------------------
 
-class NodeEmbedding final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:protoembedding.NodeEmbedding) */ {
- public:
-  inline NodeEmbedding() : NodeEmbedding(nullptr) {}
-  ~NodeEmbedding() override;
-  explicit PROTOBUF_CONSTEXPR NodeEmbedding(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  NodeEmbedding(const NodeEmbedding& from);
-  NodeEmbedding(NodeEmbedding&& from) noexcept
-    : NodeEmbedding() {
-    *this = ::std::move(from);
-  }
-
-  inline NodeEmbedding& operator=(const NodeEmbedding& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline NodeEmbedding& operator=(NodeEmbedding&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const NodeEmbedding& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const NodeEmbedding* internal_default_instance() {
-    return reinterpret_cast<const NodeEmbedding*>(
-               &_NodeEmbedding_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    1;
-
-  friend void swap(NodeEmbedding& a, NodeEmbedding& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(NodeEmbedding* other) {
-    if (other == this) return;
-  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() != nullptr &&
-        GetOwningArena() == other->GetOwningArena()) {
-   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() == other->GetOwningArena()) {
-  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(NodeEmbedding* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  NodeEmbedding* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
-    return CreateMaybeMessage<NodeEmbedding>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const NodeEmbedding& from);
-  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom( const NodeEmbedding& from) {
-    NodeEmbedding::MergeImpl(*this, from);
-  }
-  private:
-  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
-  public:
-  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
-  uint8_t* _InternalSerialize(
-      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
-  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
-
-  private:
-  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(NodeEmbedding* other);
-
-  private:
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "protoembedding.NodeEmbedding";
-  }
-  protected:
-  explicit NodeEmbedding(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  enum : int {
-    kValuesFieldNumber = 1,
-  };
-  // repeated float values = 1;
-  int values_size() const;
-  private:
-  int _internal_values_size() const;
-  public:
-  void clear_values();
-  private:
-  float _internal_values(int index) const;
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< float >&
-      _internal_values() const;
-  void _internal_add_values(float value);
-  ::PROTOBUF_NAMESPACE_ID::RepeatedField< float >*
-      _internal_mutable_values();
-  public:
-  float values(int index) const;
-  void set_values(int index, float value);
-  void add_values(float value);
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< float >&
-      values() const;
-  ::PROTOBUF_NAMESPACE_ID::RepeatedField< float >*
-      mutable_values();
-
-  // @@protoc_insertion_point(class_scope:protoembedding.NodeEmbedding)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  struct Impl_ {
-    ::PROTOBUF_NAMESPACE_ID::RepeatedField< float > values_;
-    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_embedding_2eproto;
-};
-// -------------------------------------------------------------------
-
 class NodeEmbeddingResponse final :
     public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:protoembedding.NodeEmbeddingResponse) */ {
  public:
@@ -435,7 +270,7 @@ class NodeEmbeddingResponse final :
                &_NodeEmbeddingResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    2;
+    1;
 
   friend void swap(NodeEmbeddingResponse& a, NodeEmbeddingResponse& b) {
     a.Swap(&b);
@@ -508,28 +343,33 @@ class NodeEmbeddingResponse final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kEmbeddingsFieldNumber = 1,
-    kMissingIdsFieldNumber = 2,
+    kDimensionsFieldNumber = 2,
+    kMissingIdsFieldNumber = 3,
+    kEmbeddingsDataFieldNumber = 1,
   };
-  // repeated .protoembedding.NodeEmbedding embeddings = 1;
-  int embeddings_size() const;
+  // repeated int32 dimensions = 2;
+  int dimensions_size() const;
   private:
-  int _internal_embeddings_size() const;
+  int _internal_dimensions_size() const;
   public:
-  void clear_embeddings();
-  ::protoembedding::NodeEmbedding* mutable_embeddings(int index);
-  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::protoembedding::NodeEmbedding >*
-      mutable_embeddings();
+  void clear_dimensions();
   private:
-  const ::protoembedding::NodeEmbedding& _internal_embeddings(int index) const;
-  ::protoembedding::NodeEmbedding* _internal_add_embeddings();
+  int32_t _internal_dimensions(int index) const;
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >&
+      _internal_dimensions() const;
+  void _internal_add_dimensions(int32_t value);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >*
+      _internal_mutable_dimensions();
   public:
-  const ::protoembedding::NodeEmbedding& embeddings(int index) const;
-  ::protoembedding::NodeEmbedding* add_embeddings();
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::protoembedding::NodeEmbedding >&
-      embeddings() const;
+  int32_t dimensions(int index) const;
+  void set_dimensions(int index, int32_t value);
+  void add_dimensions(int32_t value);
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >&
+      dimensions() const;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >*
+      mutable_dimensions();
 
-  // repeated uint32 missing_ids = 2;
+  // repeated uint32 missing_ids = 3;
   int missing_ids_size() const;
   private:
   int _internal_missing_ids_size() const;
@@ -551,6 +391,20 @@ class NodeEmbeddingResponse final :
   ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >*
       mutable_missing_ids();
 
+  // bytes embeddings_data = 1;
+  void clear_embeddings_data();
+  const std::string& embeddings_data() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_embeddings_data(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_embeddings_data();
+  PROTOBUF_NODISCARD std::string* release_embeddings_data();
+  void set_allocated_embeddings_data(std::string* embeddings_data);
+  private:
+  const std::string& _internal_embeddings_data() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_embeddings_data(const std::string& value);
+  std::string* _internal_mutable_embeddings_data();
+  public:
+
   // @@protoc_insertion_point(class_scope:protoembedding.NodeEmbeddingResponse)
  private:
   class _Internal;
@@ -559,9 +413,11 @@ class NodeEmbeddingResponse final :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   struct Impl_ {
-    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::protoembedding::NodeEmbedding > embeddings_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t > dimensions_;
+    mutable std::atomic<int> _dimensions_cached_byte_size_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t > missing_ids_;
     mutable std::atomic<int> _missing_ids_cached_byte_size_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr embeddings_data_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -627,100 +483,106 @@ NodeEmbeddingRequest::mutable_node_ids() {
 
 // -------------------------------------------------------------------
 
-// NodeEmbedding
-
-// repeated float values = 1;
-inline int NodeEmbedding::_internal_values_size() const {
-  return _impl_.values_.size();
-}
-inline int NodeEmbedding::values_size() const {
-  return _internal_values_size();
-}
-inline void NodeEmbedding::clear_values() {
-  _impl_.values_.Clear();
-}
-inline float NodeEmbedding::_internal_values(int index) const {
-  return _impl_.values_.Get(index);
-}
-inline float NodeEmbedding::values(int index) const {
-  // @@protoc_insertion_point(field_get:protoembedding.NodeEmbedding.values)
-  return _internal_values(index);
-}
-inline void NodeEmbedding::set_values(int index, float value) {
-  _impl_.values_.Set(index, value);
-  // @@protoc_insertion_point(field_set:protoembedding.NodeEmbedding.values)
-}
-inline void NodeEmbedding::_internal_add_values(float value) {
-  _impl_.values_.Add(value);
-}
-inline void NodeEmbedding::add_values(float value) {
-  _internal_add_values(value);
-  // @@protoc_insertion_point(field_add:protoembedding.NodeEmbedding.values)
-}
-inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< float >&
-NodeEmbedding::_internal_values() const {
-  return _impl_.values_;
-}
-inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< float >&
-NodeEmbedding::values() const {
-  // @@protoc_insertion_point(field_list:protoembedding.NodeEmbedding.values)
-  return _internal_values();
-}
-inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< float >*
-NodeEmbedding::_internal_mutable_values() {
-  return &_impl_.values_;
-}
-inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< float >*
-NodeEmbedding::mutable_values() {
-  // @@protoc_insertion_point(field_mutable_list:protoembedding.NodeEmbedding.values)
-  return _internal_mutable_values();
-}
-
-// -------------------------------------------------------------------
-
 // NodeEmbeddingResponse
 
-// repeated .protoembedding.NodeEmbedding embeddings = 1;
-inline int NodeEmbeddingResponse::_internal_embeddings_size() const {
-  return _impl_.embeddings_.size();
+// bytes embeddings_data = 1;
+inline void NodeEmbeddingResponse::clear_embeddings_data() {
+  _impl_.embeddings_data_.ClearToEmpty();
 }
-inline int NodeEmbeddingResponse::embeddings_size() const {
-  return _internal_embeddings_size();
+inline const std::string& NodeEmbeddingResponse::embeddings_data() const {
+  // @@protoc_insertion_point(field_get:protoembedding.NodeEmbeddingResponse.embeddings_data)
+  return _internal_embeddings_data();
 }
-inline void NodeEmbeddingResponse::clear_embeddings() {
-  _impl_.embeddings_.Clear();
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeEmbeddingResponse::set_embeddings_data(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.embeddings_data_.SetBytes(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:protoembedding.NodeEmbeddingResponse.embeddings_data)
 }
-inline ::protoembedding::NodeEmbedding* NodeEmbeddingResponse::mutable_embeddings(int index) {
-  // @@protoc_insertion_point(field_mutable:protoembedding.NodeEmbeddingResponse.embeddings)
-  return _impl_.embeddings_.Mutable(index);
+inline std::string* NodeEmbeddingResponse::mutable_embeddings_data() {
+  std::string* _s = _internal_mutable_embeddings_data();
+  // @@protoc_insertion_point(field_mutable:protoembedding.NodeEmbeddingResponse.embeddings_data)
+  return _s;
 }
-inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::protoembedding::NodeEmbedding >*
-NodeEmbeddingResponse::mutable_embeddings() {
-  // @@protoc_insertion_point(field_mutable_list:protoembedding.NodeEmbeddingResponse.embeddings)
-  return &_impl_.embeddings_;
+inline const std::string& NodeEmbeddingResponse::_internal_embeddings_data() const {
+  return _impl_.embeddings_data_.Get();
 }
-inline const ::protoembedding::NodeEmbedding& NodeEmbeddingResponse::_internal_embeddings(int index) const {
-  return _impl_.embeddings_.Get(index);
+inline void NodeEmbeddingResponse::_internal_set_embeddings_data(const std::string& value) {
+  
+  _impl_.embeddings_data_.Set(value, GetArenaForAllocation());
 }
-inline const ::protoembedding::NodeEmbedding& NodeEmbeddingResponse::embeddings(int index) const {
-  // @@protoc_insertion_point(field_get:protoembedding.NodeEmbeddingResponse.embeddings)
-  return _internal_embeddings(index);
+inline std::string* NodeEmbeddingResponse::_internal_mutable_embeddings_data() {
+  
+  return _impl_.embeddings_data_.Mutable(GetArenaForAllocation());
 }
-inline ::protoembedding::NodeEmbedding* NodeEmbeddingResponse::_internal_add_embeddings() {
-  return _impl_.embeddings_.Add();
+inline std::string* NodeEmbeddingResponse::release_embeddings_data() {
+  // @@protoc_insertion_point(field_release:protoembedding.NodeEmbeddingResponse.embeddings_data)
+  return _impl_.embeddings_data_.Release();
 }
-inline ::protoembedding::NodeEmbedding* NodeEmbeddingResponse::add_embeddings() {
-  ::protoembedding::NodeEmbedding* _add = _internal_add_embeddings();
-  // @@protoc_insertion_point(field_add:protoembedding.NodeEmbeddingResponse.embeddings)
-  return _add;
-}
-inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::protoembedding::NodeEmbedding >&
-NodeEmbeddingResponse::embeddings() const {
-  // @@protoc_insertion_point(field_list:protoembedding.NodeEmbeddingResponse.embeddings)
-  return _impl_.embeddings_;
+inline void NodeEmbeddingResponse::set_allocated_embeddings_data(std::string* embeddings_data) {
+  if (embeddings_data != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.embeddings_data_.SetAllocated(embeddings_data, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.embeddings_data_.IsDefault()) {
+    _impl_.embeddings_data_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:protoembedding.NodeEmbeddingResponse.embeddings_data)
 }
 
-// repeated uint32 missing_ids = 2;
+// repeated int32 dimensions = 2;
+inline int NodeEmbeddingResponse::_internal_dimensions_size() const {
+  return _impl_.dimensions_.size();
+}
+inline int NodeEmbeddingResponse::dimensions_size() const {
+  return _internal_dimensions_size();
+}
+inline void NodeEmbeddingResponse::clear_dimensions() {
+  _impl_.dimensions_.Clear();
+}
+inline int32_t NodeEmbeddingResponse::_internal_dimensions(int index) const {
+  return _impl_.dimensions_.Get(index);
+}
+inline int32_t NodeEmbeddingResponse::dimensions(int index) const {
+  // @@protoc_insertion_point(field_get:protoembedding.NodeEmbeddingResponse.dimensions)
+  return _internal_dimensions(index);
+}
+inline void NodeEmbeddingResponse::set_dimensions(int index, int32_t value) {
+  _impl_.dimensions_.Set(index, value);
+  // @@protoc_insertion_point(field_set:protoembedding.NodeEmbeddingResponse.dimensions)
+}
+inline void NodeEmbeddingResponse::_internal_add_dimensions(int32_t value) {
+  _impl_.dimensions_.Add(value);
+}
+inline void NodeEmbeddingResponse::add_dimensions(int32_t value) {
+  _internal_add_dimensions(value);
+  // @@protoc_insertion_point(field_add:protoembedding.NodeEmbeddingResponse.dimensions)
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >&
+NodeEmbeddingResponse::_internal_dimensions() const {
+  return _impl_.dimensions_;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >&
+NodeEmbeddingResponse::dimensions() const {
+  // @@protoc_insertion_point(field_list:protoembedding.NodeEmbeddingResponse.dimensions)
+  return _internal_dimensions();
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >*
+NodeEmbeddingResponse::_internal_mutable_dimensions() {
+  return &_impl_.dimensions_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >*
+NodeEmbeddingResponse::mutable_dimensions() {
+  // @@protoc_insertion_point(field_mutable_list:protoembedding.NodeEmbeddingResponse.dimensions)
+  return _internal_mutable_dimensions();
+}
+
+// repeated uint32 missing_ids = 3;
 inline int NodeEmbeddingResponse::_internal_missing_ids_size() const {
   return _impl_.missing_ids_.size();
 }
@@ -770,8 +632,6 @@ NodeEmbeddingResponse::mutable_missing_ids() {
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
-// -------------------------------------------------------------------
-
 // -------------------------------------------------------------------
 
 
