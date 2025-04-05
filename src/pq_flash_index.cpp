@@ -1303,7 +1303,7 @@ static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *use
     return size * nmemb;
 }
 
-bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings)
+bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings,int port)
 {
     // (1) BUILD PROTO
     protoembedding::NodeEmbeddingRequest req_proto;
@@ -1343,7 +1343,7 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
         zmq_setsockopt(s_socket, ZMQ_SNDTIMEO, &timeout, sizeof(timeout));
 
         // Connect to the server
-        if (zmq_connect(s_socket, "tcp://127.0.0.1:5555") != 0)
+        if (zmq_connect(s_socket, ("tcp://127.0.0.1:" + std::to_string(port)).c_str()) != 0)
         {
             std::cerr << "zmq_connect failed: " << zmq_strerror(zmq_errno()) << "\n";
             zmq_close(s_socket);
@@ -1404,10 +1404,10 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
 /**
  * fetch_embeddings_http: Function for backward compatibility, now uses ZMQ exclusively
  */
-bool fetch_embeddings_http(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings)
+bool fetch_embeddings_http(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings,int port)
 {
     // Use ZMQ implementation exclusively
-    return fetch_embeddings_zmq(node_ids, out_embeddings);
+    return fetch_embeddings_zmq(node_ids, out_embeddings, port);
 }
 
 //! Should be aligned with utils.h::prepare_base_for_inner_products
@@ -1441,9 +1441,10 @@ void preprocess_fetched_embeddings(std::vector<std::vector<float>> &embeddings, 
             }
 
             // Add the extra coordinate for MIPS->L2 conversion
-            float res = 1 - (norm_sq / (max_base_norm * max_base_norm));
-            res = res <= 0 ? 0 : std::sqrt(res);
-            emb.resize(data_dim, res);
+            // float res = 1 - (norm_sq / (max_base_norm * max_base_norm));
+            // res = res <= 0 ? 0 : std::sqrt(res);
+            // emb.resize(data_dim, res);
+            emb.resize(data_dim, 0);
         }
         else if (metric == diskann::Metric::COSINE)
         {
@@ -1617,8 +1618,13 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
             // Fetch embeddings from the embedding server
             std::vector<std::vector<float>> embeddings;
-            bool success = fetch_embeddings_http(node_ids, embeddings);
-
+            bool success = fetch_embeddings_zmq(node_ids, embeddings, 5555);
+#ifndef NDEBUG
+            // new embedding
+            // std::vector<std::vector<float>> new_embeddings;
+            // bool success_new = fetch_embeddings_zmq(node_ids, new_embeddings, 7777);
+            // preprocess_fetched_embeddings(new_embeddings, this->metric, this->_max_base_norm, this->_data_dim);
+#endif
             if (!success || embeddings.size() != node_ids.size())
             {
                 diskann::cout << "Failed to fetch embeddings from the embedding server" << std::endl;
@@ -1679,6 +1685,28 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                     dists_out[i] = distance;
                     // node_distances[ids[i]] = distance;  // Uncomment if caching in non-dedup mode is desired
                 }
+                
+#ifndef NDEBUG
+                // new embedding
+                // new buffer for distance computation
+                // float *new_dist_scratch = new float[n_ids];
+                // for (size_t i = 0; i < n_ids; i++)
+                // {
+                //     embeddings[i].resize(this->_aligned_dim, 0);
+                //     memcpy(data_buf, embeddings[i].data(), this->_aligned_dim * sizeof(T));
+                //     float distance =
+                //         this->_dist_cmp->compare(aligned_query_T, data_buf, static_cast<uint32_t>(this->_aligned_dim));
+                //     new_dist_scratch[i] = distance;
+                // }
+                
+                // // compare the permutation of sort result of distance_out and new_dist_scratch, like i want to check the idx of top1 is the same idx of top1
+                
+                
+                
+                
+                
+
+#endif
             }
         }
     };
@@ -2024,7 +2052,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             cpu_timer.reset();
             // have a function to prune the node_nbrs and nnbrs
 
-            prune_node_nbrs(node_nbrs, nnbrs, 0.5f);
+            // prune_node_nbrs(node_nbrs, nnbrs, 0.5f);
             compute_dists(node_nbrs, nnbrs, dist_scratch);
             if (stats != nullptr)
             {
@@ -2080,7 +2108,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
         Timer fetch_timer;
         std::vector<std::vector<float>> real_embeddings;
-        bool success = fetch_embeddings_http(node_ids, real_embeddings);
+        bool success = fetch_embeddings_zmq(node_ids, real_embeddings, 5555);
         if (!success)
         {
             throw ANNException("Failed to fetch embeddings", -1, __FUNCSIG__, __FILE__, __LINE__);
