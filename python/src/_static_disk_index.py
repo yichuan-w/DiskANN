@@ -120,6 +120,7 @@ class StaticDiskIndex:
         skip_search_reorder: bool = False,
         recompute_beighbor_embeddings: bool = False,
         dedup_node_dis: bool = False,
+        prune_ratio: float = 0,
     ) -> QueryResponse:
         """
         Searches the index by a single query vector.
@@ -161,6 +162,7 @@ class StaticDiskIndex:
             skip_search_reorder=skip_search_reorder,
             recompute_beighbor_embeddings=recompute_beighbor_embeddings,
             dedup_node_dis=dedup_node_dis,
+            prune_ratio=prune_ratio,
         )
         return QueryResponse(identifiers=neighbors, distances=distances)
 
@@ -175,6 +177,7 @@ class StaticDiskIndex:
         skip_search_reorder: bool = False,
         recompute_beighbor_embeddings: bool = False,
         dedup_node_dis: bool = False,
+        prune_ratio: float = 0,
     ) -> QueryResponseBatch:
         """
         Searches the index by a batch of query vectors.
@@ -225,5 +228,6 @@ class StaticDiskIndex:
             skip_search_reorder=skip_search_reorder,
             recompute_beighbor_embeddings=recompute_beighbor_embeddings,
             dedup_node_dis=dedup_node_dis,
+            prune_ratio=prune_ratio,
         )
         return QueryResponseBatch(identifiers=neighbors, distances=distances)
