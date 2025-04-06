@@ -1483,7 +1483,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     // printf("cached_beam_search\n");
     // diskann::cout << "cached_beam_search" << std::endl;
     //diskann out prune_ratio
+    prune_ratio = 1 - prune_ratio;
     diskann::cout << "prune_ratio: " << prune_ratio << std::endl;
+    // prune_ratio = 0.8;
     uint64_t num_sector_per_nodes = DIV_ROUND_UP(_max_node_len, defaults::SECTOR_LEN);
     if (beam_width > num_sector_per_nodes * defaults::MAX_N_SECTOR_READS)
         throw ANNException("Beamwidth can not be higher than defaults::MAX_N_SECTOR_READS", -1, __FUNCSIG__, __FILE__,
@@ -1730,11 +1732,12 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                 aq_priority_queue.push(std::make_pair(dists_out[i], node_nbrs[i]));
             }
             //select all ratio=prune_ratio in aq_priority_queue but need to check if the node_id is already visited, dont need to pop
-            std::vector<std::pair<uint32_t, float>> promising_nodes;
+            std::vector<std::pair<float, uint32_t>> promising_nodes;
 
-            std::vector<std::pair<uint32_t, float>> roll_back_nodes;
+            std::vector<std::pair<float, uint32_t>> roll_back_nodes;
             //1. visit top prune_ratio*length of aq_priority_queue nodes in aq_priority_queue and put the node_id not visited into a vector
-            for (uint64_t i = 0; i < prune_ratio * aq_priority_queue.size(); i++)
+            uint64_t original_size = aq_priority_queue.size();
+            for (uint64_t i = 0; i < prune_ratio * original_size; i++)
             {
                 auto top_node = aq_priority_queue.top();
                 roll_back_nodes.push_back(top_node);
