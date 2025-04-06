@@ -1264,11 +1264,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const bool use_reorder_data, QueryStats *stats,
                                                  bool USE_DEFERRED_FETCH, bool skip_search_reorder,
                                                  bool recompute_beighbor_embeddings, bool dedup_node_dis,
-                                                 float prune_ratio)
+                                                 float prune_ratio, const bool batch_recompute)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, std::numeric_limits<uint32_t>::max(),
                        use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings,
-                       dedup_node_dis, prune_ratio);
+                       dedup_node_dis, prune_ratio, batch_recompute);
 }
 
 template <typename T, typename LabelT>
@@ -1278,11 +1278,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const bool use_reorder_data, QueryStats *stats,
                                                  bool USE_DEFERRED_FETCH, bool skip_search_reorder,
                                                  bool recompute_beighbor_embeddings, bool dedup_node_dis,
-                                                 float prune_ratio)
+                                                 float prune_ratio, const bool batch_recompute)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, use_filter, filter_label,
                        std::numeric_limits<uint32_t>::max(), use_reorder_data, stats, USE_DEFERRED_FETCH,
-                       skip_search_reorder, recompute_beighbor_embeddings, dedup_node_dis, prune_ratio);
+                       skip_search_reorder, recompute_beighbor_embeddings, dedup_node_dis, prune_ratio, batch_recompute);
 }
 
 template <typename T, typename LabelT>
@@ -1291,12 +1291,12 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const uint32_t io_limit, const bool use_reorder_data,
                                                  QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder,
                                                  bool recompute_beighbor_embeddings, bool dedup_node_dis,
-                                                 float prune_ratio)
+                                                 float prune_ratio, const bool batch_recompute)
 {
     LabelT dummy_filter = 0;
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, false, dummy_filter, io_limit,
                        use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings,
-                       dedup_node_dis, prune_ratio);
+                       dedup_node_dis, prune_ratio, batch_recompute);
 }
 
 // A helper callback for cURL
@@ -1477,7 +1477,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const uint32_t io_limit, const bool use_reorder_data,
                                                  QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder,
                                                  bool recompute_beighbor_embeddings, const bool dedup_node_dis,
-                                                 float prune_ratio)
+                                                 float prune_ratio, const bool batch_recompute)
 {
     // printf("cached_beam_search\n");
     // diskann::cout << "cached_beam_search" << std::endl;
@@ -1972,6 +1972,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             auto &frontier_nhood = frontier_nhoods[completedIndex];
             (*ctx.m_pRequestsStatus)[completedIndex] = IOContext::PROCESS_COMPLETE;
 #else
+        std::vector<uint32_t> batched_node_ids;
+
         for (auto &frontier_nhood : frontier_nhoods)
         {
 #endif
@@ -2029,18 +2031,64 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             // have a function to prune the node_nbrs and nnbrs
 
             prune_node_nbrs(node_nbrs, nnbrs);
-            compute_dists(node_nbrs, nnbrs, dist_scratch);
-            if (stats != nullptr)
-            {
-                stats->n_cmps += (uint32_t)nnbrs;
-                stats->cpu_us += (float)cpu_timer.elapsed();
-            }
 
-            cpu_timer.reset();
+            if (!batch_recompute)
+            {
+                compute_dists(node_nbrs, nnbrs, dist_scratch);
+                if (stats != nullptr)
+                {
+                    stats->n_cmps += (uint32_t)nnbrs;
+                    stats->cpu_us += (float)cpu_timer.elapsed();
+                }
+
+                cpu_timer.reset();
+                // process prefetch-ed nhood
+                for (uint64_t m = 0; m < nnbrs; ++m)
+                {
+                    uint32_t id = node_nbrs[m];
+                    if (visited.insert(id).second)
+                    {
+                        if (!use_filter && _dummy_pts.find(id) != _dummy_pts.end())
+                            continue;
+
+                        if (use_filter && !(point_has_label(id, filter_label)) &&
+                            (!_use_universal_label || !point_has_label(id, _universal_filter_label)))
+                            continue;
+                        cmps++;
+                        float dist = dist_scratch[m];
+                        if (stats != nullptr)
+                        {
+                            stats->n_cmps++;
+                        }
+
+                        Neighbor nn(id, dist);
+                        retset.insert(nn);
+                    }
+                }
+
+                if (stats != nullptr)
+                {
+                    stats->cpu_us += (float)cpu_timer.elapsed();
+                }
+            }
+            else
+            {
+                // add all the node_nbrs to the batch_requests
+                batched_node_ids.insert(batched_node_ids.end(), node_nbrs, node_nbrs + nnbrs);
+            }
+        }
+
+        if (batch_recompute)
+        {
+            auto nnbrs = batched_node_ids.size();
+
+            compute_dists(batched_node_ids.data(), nnbrs, dist_scratch);
+            // ! Not sure if dist_scratch has enough space
+
             // process prefetch-ed nhood
             for (uint64_t m = 0; m < nnbrs; ++m)
             {
-                uint32_t id = node_nbrs[m];
+                uint32_t id = batched_node_ids[m];
                 if (visited.insert(id).second)
                 {
                     if (!use_filter && _dummy_pts.find(id) != _dummy_pts.end())
@@ -2059,11 +2107,6 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                     Neighbor nn(id, dist);
                     retset.insert(nn);
                 }
-            }
-
-            if (stats != nullptr)
-            {
-                stats->cpu_us += (float)cpu_timer.elapsed();
             }
         }
 

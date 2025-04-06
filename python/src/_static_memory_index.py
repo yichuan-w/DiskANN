@@ -137,6 +137,7 @@ class StaticMemoryIndex:
         recompute_beighbor_embeddings: bool = False,
         dedup_node_dis: bool = False,
         prune_ratio: float = 0,
+        batch_recompute: bool = False,
     ) -> QueryResponse:
         """
         Searches the index by a single query vector.
@@ -186,6 +187,7 @@ class StaticMemoryIndex:
                 recompute_beighbor_embeddings=recompute_beighbor_embeddings,
                 dedup_node_dis=dedup_node_dis,
                 prune_ratio=prune_ratio,
+                batch_recompute=batch_recompute,
             )
         else:
             filter = self._labels_map[filter_label]
@@ -205,6 +207,7 @@ class StaticMemoryIndex:
         recompute_beighbor_embeddings: bool = False,
         dedup_node_dis: bool = False,
         prune_ratio: float = 0,
+        batch_recompute: bool = False,
     ) -> QueryResponseBatch:
         """
         Searches the index by a batch of query vectors.
@@ -250,5 +253,6 @@ class StaticMemoryIndex:
             recompute_beighbor_embeddings=recompute_beighbor_embeddings,
             dedup_node_dis=dedup_node_dis,
             prune_ratio=prune_ratio,
+            batch_recompute=batch_recompute,
         )
         return QueryResponseBatch(identifiers=neighbors, distances=distances)
