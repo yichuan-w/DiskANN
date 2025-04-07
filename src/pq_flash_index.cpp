@@ -1753,7 +1753,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 {
     // printf("cached_beam_search\n");
     // diskann::cout << "cached_beam_search" << std::endl;
-    //diskann out prune_ratio
+    // diskann out prune_ratio
     prune_ratio = 1 - prune_ratio;
     diskann::cout << "prune_ratio: " << prune_ratio << std::endl;
     // prune_ratio = 0.8;
@@ -1976,7 +1976,8 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     // /powerrag/scaling_out/embeddings/facebook/contriever-msmarco/rpj_wiki/compressed_2/
     // 1.2 heruistic 2: use a lightweight reranker to rerank the node_nbrs and nnbrs that is not promising
     auto prune_node_nbrs = [this, pq_coord_scratch, pq_dists, recompute_beighbor_embeddings, dedup_node_dis,
-                            prune_ratio, global_pruning, &aq_priority_queue, &visited](uint32_t *&node_nbrs, uint64_t &nnbrs) {
+                            prune_ratio, global_pruning, &aq_priority_queue,
+                            &visited](uint32_t *&node_nbrs, uint64_t &nnbrs) {
         if (!recompute_beighbor_embeddings)
         {
             return;
@@ -2001,11 +2002,13 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             {
                 aq_priority_queue.push(std::make_pair(dists_out[i], node_nbrs[i]));
             }
-            //select all ratio=prune_ratio in aq_priority_queue but need to check if the node_id is already visited, dont need to pop
+            // select all ratio=prune_ratio in aq_priority_queue but need to check if the node_id is already visited,
+            // dont need to pop
             std::vector<std::pair<float, uint32_t>> promising_nodes;
 
             std::vector<std::pair<float, uint32_t>> roll_back_nodes;
-            //1. visit top prune_ratio*length of aq_priority_queue nodes in aq_priority_queue and put the node_id not visited into a vector
+            // 1. visit top prune_ratio*length of aq_priority_queue nodes in aq_priority_queue and put the node_id not
+            // visited into a vector
             uint64_t original_size = aq_priority_queue.size();
             for (uint64_t i = 0; i < prune_ratio * original_size; i++)
             {
@@ -2025,13 +2028,13 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                 aq_priority_queue.push(roll_back_nodes[i]);
             }
 
-            //2. assing the node_id and distance to node_nbrs and nnbrs
+            // 2. assing the node_id and distance to node_nbrs and nnbrs
             for (uint64_t i = 0; i < promising_nodes.size(); i++)
             {
                 node_nbrs[i] = promising_nodes[i].second;
             }
             nnbrs = promising_nodes.size();
-            //then return corresponding node_nbrs and nnbrs
+            // then return corresponding node_nbrs and nnbrs
 
             delete[] dists_out;
             return;
@@ -2070,7 +2073,6 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     };
     Timer query_timer, io_timer, cpu_timer;
 
-    tsl::robin_set<size_t> &visited = query_scratch->visited;
     NeighborPriorityQueue &retset = query_scratch->retset;
     retset.reserve(l_search);
     std::vector<Neighbor> &full_retset = query_scratch->full_retset;
