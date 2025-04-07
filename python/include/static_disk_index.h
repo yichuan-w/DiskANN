@@ -48,13 +48,14 @@ template <typename DT> class StaticDiskIndex
                                                uint64_t knn, uint64_t complexity, uint64_t beam_width,
                                                bool USE_DEFERRED_FETCH = false, bool skip_search_reorder = false,
                                                bool recompute_beighbor_embeddings = false, bool dedup_node_dis = false,
-                                               float prune_ratio = 0, bool batch_recompute = false);
+                                               float prune_ratio = 0, bool batch_recompute = false,
+                                               bool global_pruning = false);
 
     NeighborsAndDistances<StaticIdType> batch_search(
         py::array_t<DT, py::array::c_style | py::array::forcecast> &queries, uint64_t num_queries, uint64_t knn,
         uint64_t complexity, uint64_t beam_width, uint32_t num_threads, bool USE_DEFERRED_FETCH = false,
         bool skip_search_reorder = false, bool recompute_beighbor_embeddings = false, bool dedup_node_dis = false,
-        float prune_ratio = 0, bool batch_recompute = false);
+        float prune_ratio = 0, bool batch_recompute = false, bool global_pruning = false);
 
   private:
     std::shared_ptr<AlignedFileReader> _reader;

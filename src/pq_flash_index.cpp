@@ -1508,11 +1508,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const bool use_reorder_data, QueryStats *stats,
                                                  bool USE_DEFERRED_FETCH, bool skip_search_reorder,
                                                  bool recompute_beighbor_embeddings, bool dedup_node_dis,
-                                                 float prune_ratio, const bool batch_recompute)
+                                                 float prune_ratio, const bool batch_recompute, bool global_pruning)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, std::numeric_limits<uint32_t>::max(),
                        use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings,
-                       dedup_node_dis, prune_ratio, batch_recompute);
+                       dedup_node_dis, prune_ratio, batch_recompute, global_pruning);
 }
 
 template <typename T, typename LabelT>
@@ -1522,12 +1522,12 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const bool use_reorder_data, QueryStats *stats,
                                                  bool USE_DEFERRED_FETCH, bool skip_search_reorder,
                                                  bool recompute_beighbor_embeddings, bool dedup_node_dis,
-                                                 float prune_ratio, const bool batch_recompute)
+                                                 float prune_ratio, const bool batch_recompute, bool global_pruning)
 {
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, use_filter, filter_label,
                        std::numeric_limits<uint32_t>::max(), use_reorder_data, stats, USE_DEFERRED_FETCH,
                        skip_search_reorder, recompute_beighbor_embeddings, dedup_node_dis, prune_ratio,
-                       batch_recompute);
+                       batch_recompute, global_pruning);
 }
 
 template <typename T, typename LabelT>
@@ -1536,12 +1536,12 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const uint32_t io_limit, const bool use_reorder_data,
                                                  QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder,
                                                  bool recompute_beighbor_embeddings, bool dedup_node_dis,
-                                                 float prune_ratio, const bool batch_recompute)
+                                                 float prune_ratio, const bool batch_recompute, bool global_pruning)
 {
     LabelT dummy_filter = 0;
     cached_beam_search(query1, k_search, l_search, indices, distances, beam_width, false, dummy_filter, io_limit,
                        use_reorder_data, stats, USE_DEFERRED_FETCH, skip_search_reorder, recompute_beighbor_embeddings,
-                       dedup_node_dis, prune_ratio, batch_recompute);
+                       dedup_node_dis, prune_ratio, batch_recompute, global_pruning);
 }
 
 // A helper callback for cURL
@@ -1762,7 +1762,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const uint32_t io_limit, const bool use_reorder_data,
                                                  QueryStats *stats, bool USE_DEFERRED_FETCH, bool skip_search_reorder,
                                                  bool recompute_beighbor_embeddings, const bool dedup_node_dis,
-                                                 float prune_ratio, const bool batch_recompute)
+                                                 float prune_ratio, const bool batch_recompute, bool global_pruning)
 {
     // printf("cached_beam_search\n");
     // diskann::cout << "cached_beam_search" << std::endl;
@@ -1976,7 +1976,6 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     };
 
     // Add logic of global pruning
-    bool global_pruning = false;
     // Using a priority queue to record the PQ distance - use min heap for nearest neighbors
     std::priority_queue<std::pair<float, uint32_t>, std::vector<std::pair<float, uint32_t>>,
                         std::greater<std::pair<float, uint32_t>>>

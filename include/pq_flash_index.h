@@ -72,7 +72,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
                                               const bool skip_search_reorder = false,
                                               const bool recompute_beighbor_embeddings = false,
                                               const bool dedup_node_dis = false, float prune_ratio = 0,
-                                              const bool batch_recompute = false);
+                                              const bool batch_recompute = false, bool global_pruning = false);
 
     DISKANN_DLLEXPORT void cached_beam_search(const T *query, const uint64_t k_search, const uint64_t l_search,
                                               uint64_t *res_ids, float *res_dists, const uint64_t beam_width,
@@ -82,7 +82,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
                                               const bool skip_search_reorder = false,
                                               const bool recompute_beighbor_embeddings = false,
                                               const bool dedup_node_dis = false, float prune_ratio = 0,
-                                              const bool batch_recompute = false);
+                                              const bool batch_recompute = false, bool global_pruning = false);
 
     DISKANN_DLLEXPORT void cached_beam_search(const T *query, const uint64_t k_search, const uint64_t l_search,
                                               uint64_t *res_ids, float *res_dists, const uint64_t beam_width,
@@ -91,7 +91,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
                                               const bool skip_search_reorder = false,
                                               const bool recompute_beighbor_embeddings = false,
                                               const bool dedup_node_dis = false, float prune_ratio = 0,
-                                              const bool batch_recompute = false);
+                                              const bool batch_recompute = false, bool global_pruning = false);
 
     DISKANN_DLLEXPORT void cached_beam_search(const T *query, const uint64_t k_search, const uint64_t l_search,
                                               uint64_t *res_ids, float *res_dists, const uint64_t beam_width,
@@ -101,7 +101,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
                                               const bool skip_search_reorder = false,
                                               const bool recompute_beighbor_embeddings = false,
                                               const bool dedup_node_dis = false, float prune_ratio = 0,
-                                              const bool batch_recompute = false);
+                                              const bool batch_recompute = false, bool global_pruning = false);
 
     DISKANN_DLLEXPORT LabelT get_converted_label(const std::string &filter_label);
 
