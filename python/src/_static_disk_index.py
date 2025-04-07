@@ -122,6 +122,8 @@ class StaticDiskIndex:
         skip_search_reorder: bool = False,
         recompute_beighbor_embeddings: bool = False,
         dedup_node_dis: bool = False,
+        prune_ratio: float = 0,
+        batch_recompute: bool = False,
     ) -> QueryResponse:
         """
         Searches the index by a single query vector.
@@ -141,6 +143,7 @@ class StaticDiskIndex:
         - **skip_search_reorder**: Whether to skip search reorder for diskann search.
         - **recompute_beighbor_embeddings**: Whether to recompute the neighbor embeddings.
         - **dedup_node_dis**: Whether to dedup node distances.
+        - **batch_recompute**: Whether to batch recompute.
         """
         _query = _castable_dtype_or_raise(query, expected=self._vector_dtype)
         _assert(len(_query.shape) == 1, "query vector must be 1-d")
@@ -163,6 +166,8 @@ class StaticDiskIndex:
             skip_search_reorder=skip_search_reorder,
             recompute_beighbor_embeddings=recompute_beighbor_embeddings,
             dedup_node_dis=dedup_node_dis,
+            prune_ratio=prune_ratio,
+            batch_recompute=batch_recompute,
         )
         return QueryResponse(identifiers=neighbors, distances=distances)
 
@@ -177,6 +182,8 @@ class StaticDiskIndex:
         skip_search_reorder: bool = False,
         recompute_beighbor_embeddings: bool = False,
         dedup_node_dis: bool = False,
+        prune_ratio: float = 0,
+        batch_recompute: bool = False,
     ) -> QueryResponseBatch:
         """
         Searches the index by a batch of query vectors.
@@ -227,5 +234,7 @@ class StaticDiskIndex:
             skip_search_reorder=skip_search_reorder,
             recompute_beighbor_embeddings=recompute_beighbor_embeddings,
             dedup_node_dis=dedup_node_dis,
+            prune_ratio=prune_ratio,
+            batch_recompute=batch_recompute,
         )
         return QueryResponseBatch(identifiers=neighbors, distances=distances)
