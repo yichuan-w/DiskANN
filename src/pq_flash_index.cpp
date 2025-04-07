@@ -1682,7 +1682,7 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
 bool fetch_embeddings_http(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings)
 {
     // Use ZMQ implementation exclusively
-    return fetch_embeddings_zmq(node_ids, out_embeddings, 5556);
+    return fetch_embeddings_zmq(node_ids, out_embeddings, 5555);
 }
 
 //! Should be aligned with utils.h::prepare_base_for_inner_products
