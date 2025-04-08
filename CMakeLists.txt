@@ -58,9 +58,9 @@ set(CMAKE_STANDARD 17)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(NOT MSVC)
-	set(CMAKE_CXX_COMPILER g++)
-endif()
+# if(NOT MSVC)
+# 	set(CMAKE_CXX_COMPILER g++)
+# endif()
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
@@ -308,7 +308,10 @@ else()
     include_directories(${MKL_INCLUDE_PATH})
 
     # compile flags and link libraries 
-    add_compile_options(-m64 -Wl,--no-as-needed)
+    # if gcc/g++
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        add_compile_options(-m64 -Wl,--no-as-needed)
+    endif()
     if (NOT PYBIND)
         link_libraries(mkl_intel_ilp64 mkl_intel_thread mkl_core iomp5 pthread m dl)
     else()

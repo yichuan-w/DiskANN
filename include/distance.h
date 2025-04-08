@@ -214,7 +214,7 @@ class AVXNormalizedCosineDistanceFloat : public Distance<float>
     AVXNormalizedCosineDistanceFloat() : Distance<float>(diskann::Metric::COSINE)
     {
     }
-    DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const
+    DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const override
     {
         // Inner product returns negative values to indicate distance.
         // This will ensure that cosine is between -1 and 1.
@@ -222,7 +222,7 @@ class AVXNormalizedCosineDistanceFloat : public Distance<float>
     }
     DISKANN_DLLEXPORT virtual uint32_t post_normalization_dimension(uint32_t orig_dimension) const override;
 
-    DISKANN_DLLEXPORT virtual bool preprocessing_required() const;
+    DISKANN_DLLEXPORT virtual bool preprocessing_required() const override;
 
     DISKANN_DLLEXPORT virtual void preprocess_base_points(float *original_data, const size_t orig_dim,
                                                           const size_t num_points) override;

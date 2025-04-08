@@ -71,7 +71,7 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     DISKANN_DLLEXPORT ~Index();
 
     // Saves graph, data, metadata and associated tags.
-    DISKANN_DLLEXPORT void save(const char *filename, bool compact_before_save = false);
+    DISKANN_DLLEXPORT void save(const char *filename, bool compact_before_save = false) override;
 
     // Load functions
 #ifdef EXEC_ENV_OLS
@@ -80,7 +80,7 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     // Reads the number of frozen points from graph's metadata file section.
     DISKANN_DLLEXPORT static size_t get_graph_num_frozen_points(const std::string &graph_file);
 
-    DISKANN_DLLEXPORT void load(const char *index_file, uint32_t num_threads, uint32_t search_l);
+    DISKANN_DLLEXPORT void load(const char *index_file, uint32_t num_threads, uint32_t search_l) override;
 #endif
 
     // get some private variables
@@ -102,7 +102,7 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
 
     // Based on filter params builds a filtered or unfiltered index
     DISKANN_DLLEXPORT void build(const std::string &data_file, const size_t num_points_to_load,
-                                 IndexFilterParams &filter_params);
+                                 IndexFilterParams &filter_params) override;
 
     // Filtered Support
     DISKANN_DLLEXPORT void build_filtered_index(const char *filename, const std::string &label_file,
@@ -123,7 +123,7 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     DISKANN_DLLEXPORT void set_start_points_at_random(T radius, uint32_t random_seed = 0);
 
     // For FastL2 search on a static index, we interleave the data with graph
-    DISKANN_DLLEXPORT void optimize_index_layout();
+    DISKANN_DLLEXPORT void optimize_index_layout() override;
 
     // For FastL2 search on optimized layout
     DISKANN_DLLEXPORT void search_with_optimized_layout(const T *query, size_t K, size_t L, uint32_t *indices);
@@ -166,7 +166,7 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     // Returns number of live points left after consolidation
     // If _conc_consolidates is set in the ctor, then this call can be invoked
     // alongside inserts and lazy deletes, else it acquires _update_lock
-    DISKANN_DLLEXPORT consolidation_report consolidate_deletes(const IndexWriteParameters &parameters);
+    DISKANN_DLLEXPORT consolidation_report consolidate_deletes(const IndexWriteParameters &parameters) override;
 
     DISKANN_DLLEXPORT void prune_all_neighbors(const uint32_t max_degree, const uint32_t max_occlusion,
                                                const float alpha);
