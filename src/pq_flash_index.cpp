@@ -2543,10 +2543,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             cpu_timer.reset();
             // have a function to prune the node_nbrs and nnbrs
 
-            prune_node_nbrs(node_nbrs, nnbrs);
+            // prune_node_nbrs(node_nbrs, nnbrs);
 
             if (!batch_recompute)
             {
+                prune_node_nbrs(node_nbrs, nnbrs);
                 compute_dists(node_nbrs, nnbrs, dist_scratch);
                 if (stats != nullptr)
                 {
@@ -2594,8 +2595,10 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         if (batch_recompute)
         {
             auto nnbrs = batched_node_ids.size();
+            uint32_t *batched_data_ptr = batched_node_ids.data(); // Get pointer to data
+            prune_node_nbrs(batched_data_ptr, nnbrs);             // Prune using the pointer, nnbrs is updated
 
-            compute_dists(batched_node_ids.data(), nnbrs, batched_dists);
+            compute_dists(batched_data_ptr, nnbrs, batched_dists); // Compute dists for the pruned set
             // ! Not sure if dist_scratch has enough space
 
             // process prefetch-ed nhood
