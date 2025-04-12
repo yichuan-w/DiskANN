@@ -1975,7 +1975,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     std::priority_queue<std::pair<float, uint32_t>, std::vector<std::pair<float, uint32_t>>,
                         std::greater<std::pair<float, uint32_t>>>
         aq_priority_queue;
-    tsl::robin_set<uint64_t> &visited = query_scratch->visited;
+    tsl::robin_set<size_t> &visited = query_scratch->visited;
 
     // TODO: implement this function
     // 1. Based on some heristic to prune the node_nbrs and nnbrs that is not promising
