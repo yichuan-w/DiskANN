@@ -61,6 +61,7 @@ def build_disk_index(
     pq_disk_bytes: int = defaults.PQ_DISK_BYTES,
     vector_dtype: Optional[VectorDType] = None,
     index_prefix: str = "ann",
+    codebook_prefix: str = "",
 ) -> None:
     """
     This function will construct a DiskANN disk index. Disk indices are ideal for very large datasets that
@@ -157,6 +158,7 @@ def build_disk_index(
         indexing_ram_budget=build_memory_maximum,
         num_threads=num_threads,
         pq_disk_bytes=pq_disk_bytes,
+        codebook_prefix=codebook_prefix,
     )
     _write_index_metadata(
         index_prefix_path, vector_dtype_actual, dap_metric, num_points, dimensions

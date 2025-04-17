@@ -3118,6 +3118,45 @@ void Index<T, TagT, LabelT>::get_active_tags(tsl::robin_set<TagT> &active_tags)
     }
 }
 
+template <typename T, typename TagT, typename LabelT>
+void Index<T, TagT, LabelT>::get_degree_stats(size_t &max_deg, size_t &min_deg, size_t &avg_deg, size_t &cnt_deg)
+{
+    max_deg = 0;
+    min_deg = SIZE_MAX;
+    avg_deg = 0;
+    cnt_deg = 0;
+    size_t total = 0;
+    for (size_t i = 0; i < _nd; i++)
+    {
+        auto &pool = _graph_store->get_neighbours((location_t)i);
+        cnt_deg += (pool.size() < 2);
+        max_deg = std::max(max_deg, pool.size());
+        min_deg = std::min(min_deg, pool.size());
+        total += pool.size();
+    }
+    avg_deg = total / _nd;
+}
+
+template <typename T, typename TagT, typename LabelT>
+void Index<T, TagT, LabelT>::dump_degree_stats(std::string filename)
+{
+    std::ofstream file(filename);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: Could not open file " << filename << " for writing" << std::endl;
+        return;
+    }
+
+    // Write each node's degree to the file, one per line
+    for (size_t i = 0; i < _nd; i++)
+    {
+        auto &pool = _graph_store->get_neighbours((location_t)i);
+        file << pool.size() << std::endl;
+    }
+
+    file.close();
+}
+
 template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::print_status()
 {
     std::shared_lock<std::shared_timed_mutex> ul(_update_lock);

@@ -13,23 +13,26 @@ template <typename DT>
 void build_disk_index(const diskann::Metric metric, const std::string &data_file_path,
                       const std::string &index_prefix_path, const uint32_t complexity, const uint32_t graph_degree,
                       const double final_index_ram_limit, const double indexing_ram_budget, const uint32_t num_threads,
-                      const uint32_t pq_disk_bytes)
+                      const uint32_t pq_disk_bytes, const std::string &codebook_prefix)
 {
     std::string params = std::to_string(graph_degree) + " " + std::to_string(complexity) + " " +
                          std::to_string(final_index_ram_limit) + " " + std::to_string(indexing_ram_budget) + " " +
                          std::to_string(num_threads);
     if (pq_disk_bytes > 0)
         params = params + " " + std::to_string(pq_disk_bytes);
-    diskann::build_disk_index<DT>(data_file_path.c_str(), index_prefix_path.c_str(), params.c_str(), metric);
+    if (!codebook_prefix.empty())
+        params = params + " " + codebook_prefix;
+    diskann::build_disk_index<DT>(data_file_path.c_str(), index_prefix_path.c_str(), params.c_str(), metric, false,
+                                  codebook_prefix);
 }
 
 template void build_disk_index<float>(diskann::Metric, const std::string &, const std::string &, uint32_t, uint32_t,
-                                      double, double, uint32_t, uint32_t);
+                                      double, double, uint32_t, uint32_t, const std::string &);
 
 template void build_disk_index<uint8_t>(diskann::Metric, const std::string &, const std::string &, uint32_t, uint32_t,
-                                        double, double, uint32_t, uint32_t);
+                                        double, double, uint32_t, uint32_t, const std::string &);
 template void build_disk_index<int8_t>(diskann::Metric, const std::string &, const std::string &, uint32_t, uint32_t,
-                                       double, double, uint32_t, uint32_t);
+                                       double, double, uint32_t, uint32_t, const std::string &);
 
 template <typename T, typename TagT, typename LabelT>
 std::string prepare_filtered_label_map(diskann::Index<T, TagT, LabelT> &index, const std::string &index_output_path,

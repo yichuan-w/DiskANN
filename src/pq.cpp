@@ -1143,6 +1143,14 @@ void generate_quantized_data(const std::string &data_file_to_use, const std::str
     else
     {
         diskann::cout << "Skip Training with predefined pivots in: " << pq_pivots_path << std::endl;
+        if (file_exists(pq_compressed_vectors_path))
+        {
+            diskann::cout << "! Pivot exists, but compressed vectors do not exist, please check the file path"
+                          << std::endl;
+            diskann::cout << "It's " << pq_compressed_vectors_path << " and " << pq_pivots_path << std::endl;
+            assert(false);
+        }
+        return;
     }
     generate_pq_data_from_pivots<T>(data_file_to_use, NUM_PQ_CENTROIDS, (uint32_t)num_pq_chunks, pq_pivots_path,
                                     pq_compressed_vectors_path, use_opq);

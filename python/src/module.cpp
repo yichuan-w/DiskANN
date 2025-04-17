@@ -44,7 +44,7 @@ template <typename T> inline void add_variant(py::module_ &m, const Variant &var
 {
     m.def(variant.disk_builder_name.c_str(), &diskannpy::build_disk_index<T>, "distance_metric"_a, "data_file_path"_a,
           "index_prefix_path"_a, "complexity"_a, "graph_degree"_a, "final_index_ram_limit"_a, "indexing_ram_budget"_a,
-          "num_threads"_a, "pq_disk_bytes"_a);
+          "num_threads"_a, "pq_disk_bytes"_a, "codebook_prefix"_a = "");
 
     m.def(variant.memory_builder_name.c_str(), &diskannpy::build_memory_index<T>, "distance_metric"_a,
           "data_file_path"_a, "index_output_path"_a, "graph_degree"_a, "complexity"_a, "alpha"_a, "num_threads"_a,

@@ -489,7 +489,7 @@ int merge_shards(const std::string &vamana_prefix, const std::string &vamana_suf
 /* If the number of filters per point N exceeds the graph degree R,
   then it is difficult to have edges to all labels from this point.
   This function break up such dense points to have only a threshold of maximum
-  T labels per point  It divides one graph nodes to multiple nodes and append
+  T labels per point It divides one graph nodes to multiple nodes and append
   the new nodes at the end. The dummy map contains the real graph id of the
   new nodes added to the graph */
 template <typename T>
@@ -745,6 +745,15 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
             }
             _index.build_filtered_index(shard_base_file.c_str(), shard_labels_file, shard_base_pts);
         }
+
+        // cal deg stats
+        size_t max_deg = 0, min_deg = SIZE_MAX, avg_deg = 0, cnt_deg = 0;
+        _index.get_degree_stats(max_deg, min_deg, avg_deg, cnt_deg);
+        std::cout << "! For shard " << p << " Degree stats: " << max_deg << ", " << min_deg << ", " << avg_deg << ", "
+                  << cnt_deg << std::endl;
+        std::string shard_degree_stats_file = shard_index_file + "_degree_stats.txt";
+        _index.dump_degree_stats(shard_degree_stats_file);
+
         _index.save(shard_index_file.c_str());
         // copy universal label file from first shard to the final destination
         // index, since all shards anyway share the universal label
@@ -1213,18 +1222,31 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     // disk needed!
     if (compareMetric == diskann::Metric::INNER_PRODUCT)
     {
-        Timer timer;
+        // Timer timer;
         std::cout << "Using Inner Product search, so need to pre-process base "
                      "data into temp file. Please ensure there is additional "
                      "(n*(d+1)*4) bytes for storing pre-processed base vectors, "
                      "apart from the interim indices created by DiskANN and the final index."
                   << std::endl;
         data_file_to_use = prepped_base;
-        float max_norm_of_base = diskann::prepare_base_for_inner_products<T>(base_file, prepped_base);
+        // float max_norm_of_base = diskann::prepare_base_for_inner_products<T>(base_file, prepped_base);
         std::string norm_file = disk_index_path + "_max_base_norm.bin";
-        diskann::save_bin<float>(norm_file, &max_norm_of_base, 1, 1);
-        diskann::cout << timer.elapsed_seconds_for_step("preprocessing data for inner product") << std::endl;
-        created_temp_file_for_processed_data = true;
+        // diskann::save_bin<float>(norm_file, &max_norm_of_base, 1, 1);
+        // diskann::cout << timer.elapsed_seconds_for_step("preprocessing data for inner product") << std::endl;
+        // created_temp_file_for_processed_data = true;
+
+        diskann::cout << "Reading max_norm_of_base from " << norm_file << std::endl;
+        float *max_norm_of_base_ptr;
+        size_t npts, ndims;
+        diskann::load_bin<float>(norm_file, max_norm_of_base_ptr, npts, ndims);
+        float max_norm_of_base = *max_norm_of_base_ptr;
+        diskann::cout << "max_norm_of_base: " << max_norm_of_base << std::endl;
+        diskann::cout << "! Using prepped_base file at " << prepped_base << std::endl;
+        if (!file_exists(prepped_base))
+        {
+            diskann::cout << "! prepped_base file does not exist, please check the file path" << std::endl;
+            assert(false);
+        }
     }
     else if (compareMetric == diskann::Metric::COSINE)
     {

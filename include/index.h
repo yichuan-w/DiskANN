@@ -194,6 +194,10 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     // change.
     DISKANN_DLLEXPORT static const int METADATA_ROWS = 5;
 
+    DISKANN_DLLEXPORT void get_degree_stats(size_t &max_deg, size_t &min_deg, size_t &avg_deg, size_t &cnt_deg);
+
+    DISKANN_DLLEXPORT void dump_degree_stats(std::string filename);
+
     // ********************************
     //
     // Internals of the library
