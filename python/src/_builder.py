@@ -39,12 +39,12 @@ def _valid_path_and_dtype(
         vector_dtype_actual = valid_dtype(vector_dtype)
     else:
         vector_bin_path = os.path.join(index_path, f"{index_prefix}_vectors.bin")
-        if Path(vector_bin_path).exists():
-            raise ValueError(
-                f"The path {vector_bin_path} already exists. Remove it and try again."
-            )
+        # if Path(vector_bin_path).exists():
+        #     raise ValueError(
+        #         f"The path {vector_bin_path} already exists. Remove it and try again."
+        #     )
         vector_dtype_actual = valid_dtype(data.dtype)
-        vectors_to_file(vector_file=vector_bin_path, vectors=data)
+        # vectors_to_file(vector_file=vector_bin_path, vectors=data)
 
     return vector_bin_path, vector_dtype_actual
 

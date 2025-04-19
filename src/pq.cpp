@@ -1143,7 +1143,7 @@ void generate_quantized_data(const std::string &data_file_to_use, const std::str
     else
     {
         diskann::cout << "Skip Training with predefined pivots in: " << pq_pivots_path << std::endl;
-        if (file_exists(pq_compressed_vectors_path))
+        if (!file_exists(pq_compressed_vectors_path))
         {
             diskann::cout << "! Pivot exists, but compressed vectors do not exist, please check the file path"
                           << std::endl;

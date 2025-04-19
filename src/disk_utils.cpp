@@ -785,10 +785,10 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
         std::string shard_index_file = merged_index_prefix + "_subshard-" + std::to_string(p) + "_mem.index";
         std::string shard_index_file_data = shard_index_file + ".data";
 
-        std::remove(shard_base_file.c_str());
-        std::remove(shard_id_file.c_str());
-        std::remove(shard_index_file.c_str());
-        std::remove(shard_index_file_data.c_str());
+        // std::remove(shard_base_file.c_str());
+        // std::remove(shard_id_file.c_str());
+        // std::remove(shard_index_file.c_str());
+        // std::remove(shard_index_file_data.c_str());
         if (use_filters)
         {
             std::string shard_index_label_file = shard_index_file + "_labels.txt";
@@ -1229,7 +1229,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
                      "apart from the interim indices created by DiskANN and the final index."
                   << std::endl;
         data_file_to_use = prepped_base;
-        // float max_norm_of_base = diskann::prepare_base_for_inner_products<T>(base_file, prepped_base);
+        float max_norm_of_base = diskann::prepare_base_for_inner_products<T>(base_file, prepped_base);
         std::string norm_file = disk_index_path + "_max_base_norm.bin";
         // diskann::save_bin<float>(norm_file, &max_norm_of_base, 1, 1);
         // diskann::cout << timer.elapsed_seconds_for_step("preprocessing data for inner product") << std::endl;
@@ -1239,7 +1239,12 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
         float *max_norm_of_base_ptr;
         size_t npts, ndims;
         diskann::load_bin<float>(norm_file, max_norm_of_base_ptr, npts, ndims);
-        float max_norm_of_base = *max_norm_of_base_ptr;
+        if (max_norm_of_base != *max_norm_of_base_ptr)
+        {
+            diskann::cout << "max_norm_of_base mismatch: " << max_norm_of_base << " != " << *max_norm_of_base_ptr
+                          << std::endl;
+            assert(false);
+        }
         diskann::cout << "max_norm_of_base: " << max_norm_of_base << std::endl;
         diskann::cout << "! Using prepped_base file at " << prepped_base << std::endl;
         if (!file_exists(prepped_base))
