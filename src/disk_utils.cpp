@@ -1222,7 +1222,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     // disk needed!
     if (compareMetric == diskann::Metric::INNER_PRODUCT)
     {
-        // Timer timer;
+        Timer timer;
         std::cout << "Using Inner Product search, so need to pre-process base "
                      "data into temp file. Please ensure there is additional "
                      "(n*(d+1)*4) bytes for storing pre-processed base vectors, "
@@ -1231,9 +1231,10 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
         data_file_to_use = prepped_base;
         float max_norm_of_base = diskann::prepare_base_for_inner_products<T>(base_file, prepped_base);
         std::string norm_file = disk_index_path + "_max_base_norm.bin";
-        // diskann::save_bin<float>(norm_file, &max_norm_of_base, 1, 1);
-        // diskann::cout << timer.elapsed_seconds_for_step("preprocessing data for inner product") << std::endl;
-        // created_temp_file_for_processed_data = true;
+
+        diskann::save_bin<float>(norm_file, &max_norm_of_base, 1, 1);
+        diskann::cout << timer.elapsed_seconds_for_step("preprocessing data for inner product") << std::endl;
+        created_temp_file_for_processed_data = true;
 
         diskann::cout << "Reading max_norm_of_base from " << norm_file << std::endl;
         float *max_norm_of_base_ptr;

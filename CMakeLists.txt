@@ -488,6 +488,12 @@ include(clang-format.cmake)
 
 if(PYBIND)
     add_subdirectory(python)
+
+    install(TARGETS _diskannpy 
+        DESTINATION leann_backend_diskann
+        COMPONENT python_modules
+    )
+
 endif()
 ###############################################################################
 # PROTOBUF SECTION - Corrected to use CONFIG mode explicitly
@@ -505,11 +511,10 @@ message(STATUS "Protobuf protoc executable: ${Protobuf_PROTOC_EXECUTABLE}")
 
 include_directories(${Protobuf_INCLUDE_DIRS})
 
-protobuf_generate(
-    PROTOS ${PROJECT_SOURCE_DIR}/../embedding.proto
-    OUT_VAR generated_proto_sources
-    IMPORT_DIRS ${PROJECT_SOURCE_DIR}/../
-)
+set(PROTO_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../embedding.proto")
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILE})
+set(generated_proto_sources ${PROTO_SRCS})
+
 
 add_library(proto_embeddings STATIC ${generated_proto_sources})
 target_link_libraries(proto_embeddings PUBLIC protobuf::libprotobuf)

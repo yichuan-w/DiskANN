@@ -1551,142 +1551,139 @@ static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *use
     return size * nmemb;
 }
 
-bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings,
-                          int zmq_port = 5555)
-{
-    // 0) 构造要发送的proto请求
-    protoembedding::NodeEmbeddingRequest req_proto;
-    for (auto id : node_ids)
-        req_proto.add_node_ids(id);
+static void *g_zmq_context = zmq_ctx_new();
 
-    // 序列化请求
+struct ZmqContextManager
+{
+    ~ZmqContextManager()
+    {
+        if (g_zmq_context)
+        {
+            zmq_ctx_destroy(g_zmq_context);
+            g_zmq_context = nullptr;
+        }
+    }
+};
+static ZmqContextManager g_zmq_manager;
+
+bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings,
+                          int zmq_port)
+{
+    // 1. Protobuf 序列化：创建请求消息
+    protoembedding::NodeEmbeddingRequest req_proto;
+    for (const auto id : node_ids)
+    {
+        req_proto.add_node_ids(id);
+    }
     std::string req_str;
     if (!req_proto.SerializeToString(&req_str))
     {
-        std::cerr << "Failed to serialize NodeEmbeddingRequest.\n";
+        std::cerr << "ZMQ_FETCH_ERROR: Failed to serialize NodeEmbeddingRequest.\n";
         return false;
     }
 
-    // 1) 创建ZMQ上下文
-    void *context = zmq_ctx_new();
-    if (!context)
-    {
-        std::cerr << "zmq_ctx_new failed: " << zmq_strerror(zmq_errno()) << "\n";
-        return false;
-    }
+    // 2. 使用线程本地(thread_local)的 Socket，实现连接复用
+    // 每个线程将拥有自己独立的、持久化的 Socket
+    thread_local void *tl_socket = nullptr;
 
-    // 2) 创建一个REQ套接字
-    void *socket = zmq_socket(context, ZMQ_REQ);
-    if (!socket)
+    // 如果当前线程的 Socket 还未创建，则初始化并连接
+    if (tl_socket == nullptr)
     {
-        std::cerr << "zmq_socket failed: " << zmq_strerror(zmq_errno()) << "\n";
-        zmq_ctx_destroy(context);
-        return false;
-    }
-
-    // 可选：设置收/发超时 (单位ms)，避免无限阻塞
-    int timeout = 30000; // 30秒
-    zmq_setsockopt(socket, ZMQ_RCVTIMEO, &timeout, sizeof(timeout));
-    zmq_setsockopt(socket, ZMQ_SNDTIMEO, &timeout, sizeof(timeout));
-
-    // 3) 连接到 "tcp://127.0.0.1:port"
-    std::string endpoint = "tcp://127.0.0.1:" + std::to_string(zmq_port);
-    if (zmq_connect(socket, endpoint.c_str()) != 0)
-    {
-        std::cerr << "zmq_connect failed: " << zmq_strerror(zmq_errno()) << "\n";
-        zmq_close(socket);
-        zmq_ctx_destroy(context);
-        return false;
-    }
-
-    // 4) 发送序列化请求
-    int rc = zmq_send(socket, req_str.data(), req_str.size(), 0);
-    if (rc < 0)
-    {
-        std::cerr << "zmq_send failed: " << zmq_strerror(zmq_errno()) << "\n";
-        zmq_close(socket);
-        zmq_ctx_destroy(context);
-        return false;
-    }
-
-    // 5) 等待接收服务端返回
-    zmq_msg_t response;
-    zmq_msg_init(&response);
-    rc = zmq_msg_recv(&response, socket, 0);
-    if (rc < 0)
-    {
-        // recv失败常见原因: 超时/服务端无响应等
-        std::cerr << "zmq_msg_recv failed: " << zmq_strerror(zmq_errno()) << "\n";
-        zmq_msg_close(&response);
-        zmq_close(socket);
-        zmq_ctx_destroy(context);
-        return false;
-    }
-
-    // 6) 解析响应
-    protoembedding::NodeEmbeddingResponse resp_proto;
-    {
-        const void *resp_data = zmq_msg_data(&response);
-        size_t resp_size = zmq_msg_size(&response);
-        if (!resp_proto.ParseFromArray(resp_data, static_cast<int>(resp_size)))
+        // 从全局 Context 创建 Socket
+        tl_socket = zmq_socket(g_zmq_context, ZMQ_REQ);
+        if (!tl_socket)
         {
-            std::cerr << "Failed to parse NodeEmbeddingResponse from server.\n";
-            zmq_msg_close(&response);
-            zmq_close(socket);
-            zmq_ctx_destroy(context);
+            std::cerr << "ZMQ_FETCH_ERROR: zmq_socket() failed: " << zmq_strerror(zmq_errno()) << "\n";
+            return false;
+        }
+
+        int timeout = 30000; // 30 秒超时
+        zmq_setsockopt(tl_socket, ZMQ_RCVTIMEO, &timeout, sizeof(timeout));
+        zmq_setsockopt(tl_socket, ZMQ_SNDTIMEO, &timeout, sizeof(timeout));
+
+        std::string endpoint = "tcp://127.0.0.1:" + std::to_string(zmq_port);
+        if (zmq_connect(tl_socket, endpoint.c_str()) != 0)
+        {
+            std::cerr << "ZMQ_FETCH_ERROR: zmq_connect() to " << endpoint << " failed: " << zmq_strerror(zmq_errno())
+                      << "\n";
+            zmq_close(tl_socket);
+            tl_socket = nullptr; // 重置为空指针，以便下次调用时可以尝试重建
             return false;
         }
     }
 
-    // 7) 根据服务端的维度信息，读取真正的embedding数据
-    //    先检查resp_proto.dimensions_size()是否是2,
-    //    [batch_size, embedding_dim]
-    if (resp_proto.dimensions_size() != 2)
+    // 3. 使用已建立的连接发送请求
+    if (zmq_send(tl_socket, req_str.data(), req_str.size(), 0) < 0)
     {
-        std::cerr << "Server response has invalid dimensions size.\n";
-        zmq_msg_close(&response);
-        zmq_close(socket);
-        zmq_ctx_destroy(context);
+        std::cerr << "ZMQ_FETCH_ERROR: zmq_send() failed: " << zmq_strerror(zmq_errno()) << "\n";
+        zmq_close(tl_socket); // 连接可能已失效，关闭它
+        tl_socket = nullptr;  // 重置，强制下次重建
         return false;
     }
-    int batch_size = resp_proto.dimensions(0);
-    int embedding_dim = resp_proto.dimensions(1);
 
-    if (batch_size != (int)node_ids.size())
+    // 4. 接收响应
+    zmq_msg_t response_msg;
+    zmq_msg_init(&response_msg);
+    bool success = true;
+
+    if (zmq_msg_recv(&response_msg, tl_socket, 0) < 0)
     {
-        std::cerr << "Warning: batch_size(" << batch_size << ") != node_ids.size(" << node_ids.size() << ")!\n";
+        std::cerr << "ZMQ_FETCH_ERROR: zmq_msg_recv() failed: " << zmq_strerror(zmq_errno()) << "\n";
+        zmq_close(tl_socket); // 同样，接收超时后连接也可能无效
+        tl_socket = nullptr;  // 重置，强制下次重建
+        success = false;
+    }
+    else
+    {
+        // 5. Protobuf 反序列化并提取数据
+        protoembedding::NodeEmbeddingResponse resp_proto;
+        if (!resp_proto.ParseFromArray(zmq_msg_data(&response_msg), static_cast<int>(zmq_msg_size(&response_msg))))
+        {
+            std::cerr << "ZMQ_FETCH_ERROR: Failed to parse NodeEmbeddingResponse from server.\n";
+            success = false;
+        }
+        else
+        {
+            if (resp_proto.dimensions_size() == 2)
+            {
+                int batch_size = resp_proto.dimensions(0);
+                int embedding_dim = resp_proto.dimensions(1);
+                const std::string &emb_data = resp_proto.embeddings_data();
+                size_t expected_bytes = (size_t)batch_size * embedding_dim * sizeof(float);
+
+                if (batch_size >= 0 && emb_data.size() == expected_bytes)
+                {
+                    out_embeddings.resize(batch_size);
+                    if (batch_size > 0)
+                    {
+                        const float *float_data = reinterpret_cast<const float *>(emb_data.data());
+                        for (int i = 0; i < batch_size; ++i)
+                        {
+                            out_embeddings[i].resize(embedding_dim);
+                            std::memcpy(out_embeddings[i].data(), float_data + (size_t)i * embedding_dim,
+                                        embedding_dim * sizeof(float));
+                        }
+                    }
+                }
+                else
+                {
+                    std::cerr << "ZMQ_FETCH_ERROR: Embedding data size mismatch. Expected " << expected_bytes
+                              << " bytes, got " << emb_data.size() << ".\n";
+                    success = false;
+                }
+            }
+            else
+            {
+                std::cerr << "ZMQ_FETCH_ERROR: Server response has invalid dimensions size.\n";
+                success = false;
+            }
+        }
     }
 
-    // embeddings_data()里是连续的float数组
-    const std::string &emb_data = resp_proto.embeddings_data();
-    size_t needed_bytes = (size_t)batch_size * embedding_dim * sizeof(float);
-    if (emb_data.size() != needed_bytes)
-    {
-        std::cerr << "Embedding data size mismatch: " << emb_data.size() << " bytes, expected " << needed_bytes << "\n";
-        // 也可选择在这里直接return false
-    }
+    // 6. 清理消息对象，但保持 Socket 和 Context 开放以备下次复用
+    zmq_msg_close(&response_msg);
 
-    // 取出float数组
-    const float *float_data = reinterpret_cast<const float *>(emb_data.data());
-
-    // 8) 组装返回
-    out_embeddings.clear();
-    out_embeddings.resize(batch_size);
-    for (int i = 0; i < batch_size; i++)
-    {
-        out_embeddings[i].resize(embedding_dim);
-        std::memcpy(out_embeddings[i].data(), float_data + (size_t)i * embedding_dim, embedding_dim * sizeof(float));
-    }
-
-    // 可打印resp_proto.missing_ids()，服务端可能发回「找不到的ID」列表
-
-    // 9) 释放资源
-    zmq_msg_close(&response);
-    zmq_close(socket);
-    zmq_ctx_destroy(context);
-
-    // 10) 返回true表示fetch成功
-    return true;
+    return success;
 }
 
 /**
