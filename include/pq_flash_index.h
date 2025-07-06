@@ -34,8 +34,8 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
                                const char *pq_prefix = nullptr);
 #else
     // load compressed data, and obtains the handle to the disk-resident index
-    DISKANN_DLLEXPORT int load(uint32_t num_threads, const char *index_prefix, const char *pq_prefix = nullptr,
-                               const char *partition_prefix = nullptr);
+    DISKANN_DLLEXPORT int load(uint32_t num_threads, const char *index_prefix, int zmq_port,
+                               const char *pq_prefix = nullptr, const char *partition_prefix = nullptr);
 #endif
 
 #ifdef EXEC_ENV_OLS
@@ -263,6 +263,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     std::unordered_map<std::string, LabelT> _label_map;
 
   private:
+    int _zmq_port = 5555; // Default ZMQ port
     bool _use_partition = false;
 
     std::shared_ptr<AlignedFileReader> graph_reader; // Graph file reader

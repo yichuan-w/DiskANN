@@ -11,8 +11,8 @@ namespace diskannpy
 template <typename DT>
 StaticDiskIndex<DT>::StaticDiskIndex(const diskann::Metric metric, const std::string &index_path_prefix,
                                      const uint32_t num_threads, const size_t num_nodes_to_cache,
-                                     const uint32_t cache_mechanism, const std::string &pq_prefix,
-                                     const std::string &partition_prefix)
+                                     const uint32_t cache_mechanism, const int zmq_port,
+                                     const std::string &pq_prefix, const std::string &partition_prefix)
     : _reader(std::make_shared<PlatformSpecificAlignedFileReader>()),
       _graph_reader(std::make_shared<PlatformSpecificAlignedFileReader>()), _index(_reader, _graph_reader, metric)
 {
@@ -20,7 +20,7 @@ StaticDiskIndex<DT>::StaticDiskIndex(const diskann::Metric metric, const std::st
 
     const uint32_t _num_threads = num_threads != 0 ? num_threads : omp_get_num_procs();
     int load_success =
-        _index.load(_num_threads, index_path_prefix.c_str(), pq_prefix.c_str(), partition_prefix.c_str());
+        _index.load(_num_threads, index_path_prefix.c_str(), zmq_port, pq_prefix.c_str(), partition_prefix.c_str());
     if (load_success != 0)
     {
         throw std::runtime_error("index load failed, " + index_path_prefix);

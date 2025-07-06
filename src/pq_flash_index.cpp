@@ -884,10 +884,12 @@ int PQFlashIndex<T, LabelT>::load(MemoryMappedFiles &files, uint32_t num_threads
 {
 #else
 template <typename T, typename LabelT>
-int PQFlashIndex<T, LabelT>::load(uint32_t num_threads, const char *index_prefix, const char *pq_prefix,
+int PQFlashIndex<T, LabelT>::load(uint32_t num_threads, const char *index_prefix, int zmq_port, const char *pq_prefix,
                                   const char *partition_prefix)
 {
 #endif
+    this->_zmq_port = zmq_port;
+
     if (pq_prefix == nullptr || strcmp(pq_prefix, "") == 0)
     {
         pq_prefix = index_prefix;
@@ -1689,10 +1691,11 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
 /**
  * fetch_embeddings_http: Function for backward compatibility, now uses ZMQ exclusively
  */
-bool fetch_embeddings_http(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings)
+bool fetch_embeddings_http(const std::vector<uint32_t> &node_ids, std::vector<std::vector<float>> &out_embeddings,
+                           int zmq_port)
 {
     // Use ZMQ implementation exclusively
-    return fetch_embeddings_zmq(node_ids, out_embeddings, 5555);
+    return fetch_embeddings_zmq(node_ids, out_embeddings, zmq_port);
 }
 
 //! Should be aligned with utils.h::prepare_base_for_inner_products
@@ -1908,7 +1911,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
             // Fetch embeddings from the embedding server
             std::vector<std::vector<float>> embeddings;
-            bool success = fetch_embeddings_http(node_ids, embeddings);
+            bool success = fetch_embeddings_http(node_ids, embeddings, this->_zmq_port);
 
             if (!success || embeddings.size() != node_ids.size())
             {
@@ -2644,7 +2647,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
         Timer fetch_timer;
         std::vector<std::vector<float>> real_embeddings;
-        bool success = fetch_embeddings_http(node_ids, real_embeddings);
+        bool success = fetch_embeddings_http(node_ids, real_embeddings, this->_zmq_port);
         if (!success)
         {
             throw ANNException("Failed to fetch embeddings", -1, __FUNCSIG__, __FILE__, __LINE__);
