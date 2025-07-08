@@ -17,6 +17,7 @@
 
 # Some variables like MSVC are defined only after project(), so put that first.
 cmake_minimum_required(VERSION 3.20)
+cmake_policy(SET CMP0167 NEW)
 project(diskann)
 
 #Set option to use tcmalloc
@@ -247,8 +248,20 @@ if(NOT PYBIND)
     include_directories(${Boost_INCLUDE_DIR})
 else()
     # For PYBIND builds, we only need header-only boost components
+    if(NOT MSVC)
     find_package(Boost REQUIRED)
-    include_directories(${Boost_INCLUDE_DIRS})
+        include_directories(${Boost_INCLUDE_DIRS})
+    else()
+        # Windows - use nuget boost headers
+        set(DISKANN_BOOST_INCLUDE "${DISKANN_MSVC_PACKAGES}/boost/lib/native/include")
+        if (EXISTS ${DISKANN_BOOST_INCLUDE})
+            set(Boost_FOUND ON)
+            set(Boost_INCLUDE_DIR ${DISKANN_BOOST_INCLUDE})
+        endif()
+        if(Boost_INCLUDE_DIR)
+            include_directories(${Boost_INCLUDE_DIR})
+        endif()
+    endif()
 endif()
 
 #MKL Config
@@ -519,7 +532,8 @@ find_package(Protobuf REQUIRED)
 # Set protobuf variables for compatibility
 set(Protobuf_FOUND TRUE)
 set(Protobuf_LIBRARIES protobuf::libprotobuf)
-set(Protobuf_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/protobuf/src)
+# This is now handled by find_package(Protobuf)
+# set(Protobuf_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/protobuf/src)
 set(Protobuf_PROTOC_EXECUTABLE $<TARGET_FILE:protobuf::protoc>)
 
 message(STATUS "Protobuf found: ${Protobuf_VERSION}")
