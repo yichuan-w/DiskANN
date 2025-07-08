@@ -247,46 +247,8 @@ if(NOT PYBIND)
     include_directories(${Boost_INCLUDE_DIR})
 else()
     # For PYBIND builds, we only need header-only boost components
-    # Try to find boost headers for dynamic_bitset (header-only)
-    if(NOT MSVC)
-        find_package(Boost QUIET)
-        if(NOT Boost_FOUND)
-            # Look for boost headers in common system locations
-            find_path(Boost_INCLUDE_DIR 
-                NAMES boost/dynamic_bitset.hpp
-                PATHS /usr/include /usr/local/include /opt/homebrew/include
-                NO_DEFAULT_PATH
-            )
-            if(Boost_INCLUDE_DIR)
-                set(Boost_FOUND ON)
-                message(STATUS "Found Boost headers at: ${Boost_INCLUDE_DIR}")
-            else()
-                # Use FetchContent to get boost headers if not found locally
-                message(STATUS "Boost headers not found locally, fetching via FetchContent...")
-                include(FetchContent)
-                FetchContent_Declare(
-                    boost
-                    URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.gz
-                    URL_HASH SHA256=dcea50f40ba1ecfc448fdf886c0165cf3e525fef2c9e3e080b9804e8117b9694
-                )
-                FetchContent_MakeAvailable(boost)
-                set(Boost_INCLUDE_DIR ${boost_SOURCE_DIR})
-                set(Boost_FOUND ON)
-                message(STATUS "Using fetched Boost headers at: ${Boost_INCLUDE_DIR}")
-            endif()
-        endif()
-    else()
-        # Windows - use nuget boost headers
-        set(DISKANN_BOOST_INCLUDE "${DISKANN_MSVC_PACKAGES}/boost/lib/native/include")
-        if (EXISTS ${DISKANN_BOOST_INCLUDE})
-            set(Boost_FOUND ON)
-            set(Boost_INCLUDE_DIR ${DISKANN_BOOST_INCLUDE})
-        endif()
-    endif()
-    
-    if(Boost_INCLUDE_DIR)
-        include_directories(${Boost_INCLUDE_DIR})
-    endif()
+    find_package(Boost REQUIRED)
+    include_directories(${Boost_INCLUDE_DIRS})
 endif()
 
 #MKL Config
@@ -552,11 +514,7 @@ set(ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zlib ${CMAKE_CURRE
 ###############################################################################
 # PROTOBUF SECTION - Use submodule
 ###############################################################################
-set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(protobuf_INSTALL OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(third_party/protobuf)
+find_package(Protobuf REQUIRED)
 
 # Set protobuf variables for compatibility
 set(Protobuf_FOUND TRUE)
