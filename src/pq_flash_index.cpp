@@ -2594,7 +2594,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
         if (batch_recompute)
         {
-            auto nnbrs = batched_node_ids.size();
+            uint64_t nnbrs = static_cast<uint64_t>(batched_node_ids.size());
             uint32_t *batched_data_ptr = batched_node_ids.data(); // Get pointer to data
             prune_node_nbrs(batched_data_ptr, nnbrs);             // Prune using the pointer, nnbrs is updated
 
