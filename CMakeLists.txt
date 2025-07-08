@@ -541,13 +541,28 @@ if(PYBIND)
 
 endif()
 ###############################################################################
-# PROTOBUF SECTION - Auto-generate with correct version
+# ZLIB SECTION - Use submodule
 ###############################################################################
-set(Protobuf_USE_STATIC_LIBS OFF)
+add_subdirectory(third_party/zlib)
 
-find_package(ZLIB REQUIRED)
+# Set ZLIB variables for compatibility (zlib already creates ZLIB::ZLIB target)
+set(ZLIB_LIBRARIES zlib)
+set(ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zlib ${CMAKE_CURRENT_BINARY_DIR}/third_party/zlib)
 
-find_package(Protobuf REQUIRED)
+###############################################################################
+# PROTOBUF SECTION - Use submodule
+###############################################################################
+set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(protobuf_INSTALL OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(third_party/protobuf)
+
+# Set protobuf variables for compatibility
+set(Protobuf_FOUND TRUE)
+set(Protobuf_LIBRARIES protobuf::libprotobuf)
+set(Protobuf_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/protobuf/src)
+set(Protobuf_PROTOC_EXECUTABLE $<TARGET_FILE:protobuf::protoc>)
 
 message(STATUS "Protobuf found: ${Protobuf_VERSION}")
 message(STATUS "Protobuf include dirs: ${Protobuf_INCLUDE_DIRS}")
@@ -591,27 +606,28 @@ target_include_directories(diskann_s PRIVATE
 
 
 ###############################################################################
-# ZEROMQ SECTION - REQUIRED
+# ZEROMQ SECTION - Use submodule
 ###############################################################################
+set(ZMQ_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ENABLE_DRAFTS OFF CACHE BOOL "" FORCE)
+set(ENABLE_PRECOMPILED OFF CACHE BOOL "" FORCE)
+set(WITH_PERF_TOOL OFF CACHE BOOL "" FORCE)
+set(WITH_DOCS OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(BUILD_STATIC ON CACHE BOOL "" FORCE)
 
-find_package(ZeroMQ QUIET)
-if(NOT ZeroMQ_FOUND)
-    find_path(ZeroMQ_INCLUDE_DIR zmq.h)
-    find_library(ZeroMQ_LIBRARY zmq)
-    if(ZeroMQ_INCLUDE_DIR AND ZeroMQ_LIBRARY)
-        set(ZeroMQ_FOUND TRUE)
-    endif()
-endif()
+add_subdirectory(third_party/libzmq)
 
-if(ZeroMQ_FOUND)
-    message(STATUS "Found ZeroMQ: ${ZeroMQ_LIBRARY}")
-    include_directories(${ZeroMQ_INCLUDE_DIR})
-    target_link_libraries(diskann PRIVATE ${ZeroMQ_LIBRARY})
-    target_link_libraries(diskann_s PRIVATE ${ZeroMQ_LIBRARY})
-    add_definitions(-DUSE_ZEROMQ)
-else()
-    message(FATAL_ERROR "ZeroMQ is required but not found. Please install ZeroMQ and try again.")
-endif()
+# Set ZeroMQ variables for compatibility
+set(ZeroMQ_FOUND TRUE)
+set(ZeroMQ_LIBRARY libzmq-static)
+set(ZeroMQ_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libzmq/include)
+
+message(STATUS "Found ZeroMQ: ${ZeroMQ_LIBRARY}")
+include_directories(${ZeroMQ_INCLUDE_DIR})
+target_link_libraries(diskann PRIVATE ${ZeroMQ_LIBRARY})
+target_link_libraries(diskann_s PRIVATE ${ZeroMQ_LIBRARY})
+add_definitions(-DUSE_ZEROMQ)
 
 target_link_libraries(diskann ${PYBIND11_LIBRARIES})
 target_link_libraries(diskann_s ${PYBIND11_LIBRARIES})
