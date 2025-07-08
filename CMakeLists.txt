@@ -541,7 +541,7 @@ if(PYBIND)
 
 endif()
 ###############################################################################
-# PROTOBUF SECTION - Corrected to use CONFIG mode explicitly
+# PROTOBUF SECTION - Auto-generate with correct version
 ###############################################################################
 set(Protobuf_USE_STATIC_LIBS OFF)
 
@@ -556,12 +556,21 @@ message(STATUS "Protobuf protoc executable: ${Protobuf_PROTOC_EXECUTABLE}")
 
 include_directories(${Protobuf_INCLUDE_DIRS})
 
+# Auto-generate protobuf files to build directory
 set(PROTO_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../embedding.proto")
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILE})
-set(generated_proto_sources ${PROTO_SRCS})
+set(PROTO_SRCS "${CMAKE_CURRENT_BINARY_DIR}/embedding.pb.cc")
+set(PROTO_HDRS "${CMAKE_CURRENT_BINARY_DIR}/embedding.pb.h")
 
+# Generate protobuf files using the system protobuf version
+add_custom_command(
+    OUTPUT ${PROTO_SRCS} ${PROTO_HDRS}
+    COMMAND ${Protobuf_PROTOC_EXECUTABLE}
+    ARGS --cpp_out=${CMAKE_CURRENT_BINARY_DIR} -I${CMAKE_CURRENT_SOURCE_DIR}/.. ${PROTO_FILE}
+    DEPENDS ${PROTO_FILE}
+    COMMENT "Generating protobuf files with system protobuf version"
+)
 
-add_library(proto_embeddings STATIC ${generated_proto_sources})
+add_library(proto_embeddings STATIC ${PROTO_SRCS})
 target_link_libraries(proto_embeddings PUBLIC protobuf::libprotobuf)
 target_include_directories(proto_embeddings PUBLIC 
     ${CMAKE_CURRENT_BINARY_DIR}

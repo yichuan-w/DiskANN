@@ -382,3 +382,9 @@ rust/target
 python/src/*.so
 
 compile_commands.json
+
+# Generated protobuf files
+*.pb.cc
+*.pb.h
+src/embedding.pb.*
+include/embedding.pb.*
