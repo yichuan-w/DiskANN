@@ -266,8 +266,8 @@ else()
                 include(FetchContent)
                 FetchContent_Declare(
                     boost
-                    URL https://github.com/boostorg/boost/releases/download/boost-1.82.0/boost-1.82.0.tar.gz
-                    URL_HASH SHA256=b62bd839ea6c28265af9a1f68393eda37fab5ec1d6f9e138de64e7a9cf198617
+                    URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.gz
+                    URL_HASH SHA256=dcea50f40ba1ecfc448fdf886c0165cf3e525fef2c9e3e080b9804e8117b9694
                 )
                 FetchContent_MakeAvailable(boost)
                 set(Boost_INCLUDE_DIR ${boost_SOURCE_DIR})
