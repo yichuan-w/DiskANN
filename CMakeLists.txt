@@ -212,37 +212,82 @@ if (MSVC)
     set(Boost_USE_STATIC_LIBS ON)
 endif()
 
-if(NOT MSVC)
-    find_package(Boost COMPONENTS program_options)
-endif()
+# Only require boost::program_options when building command-line tools (NOT PYBIND)
+if(NOT PYBIND)
+    if(NOT MSVC)
+        find_package(Boost COMPONENTS program_options)
+    endif()
 
-# For Windows, fall back to nuget version if find_package didn't find it.
-if (MSVC AND NOT Boost_FOUND)
-    set(DISKANN_BOOST_INCLUDE "${DISKANN_MSVC_PACKAGES}/boost/lib/native/include")
-    # Multi-threaded static library.
-    set(PROGRAM_OPTIONS_LIB_PATTERN "${DISKANN_MSVC_PACKAGES}/boost_program_options-vc${MSVC_TOOLSET_VERSION}/lib/native/libboost_program_options-vc${MSVC_TOOLSET_VERSION}-mt-x64-*.lib")
-    file(GLOB DISKANN_BOOST_PROGRAM_OPTIONS_LIB ${PROGRAM_OPTIONS_LIB_PATTERN})
+    # For Windows, fall back to nuget version if find_package didn't find it.
+    if (MSVC AND NOT Boost_FOUND)
+        set(DISKANN_BOOST_INCLUDE "${DISKANN_MSVC_PACKAGES}/boost/lib/native/include")
+        # Multi-threaded static library.
+        set(PROGRAM_OPTIONS_LIB_PATTERN "${DISKANN_MSVC_PACKAGES}/boost_program_options-vc${MSVC_TOOLSET_VERSION}/lib/native/libboost_program_options-vc${MSVC_TOOLSET_VERSION}-mt-x64-*.lib")
+        file(GLOB DISKANN_BOOST_PROGRAM_OPTIONS_LIB ${PROGRAM_OPTIONS_LIB_PATTERN})
 
-    set(PROGRAM_OPTIONS_DLIB_PATTERN "${DISKANN_MSVC_PACKAGES}/boost_program_options-vc${MSVC_TOOLSET_VERSION}/lib/native/libboost_program_options-vc${MSVC_TOOLSET_VERSION}-mt-gd-x64-*.lib")
-    file(GLOB DISKANN_BOOST_PROGRAM_OPTIONS_DLIB ${PROGRAM_OPTIONS_DLIB_PATTERN})
+        set(PROGRAM_OPTIONS_DLIB_PATTERN "${DISKANN_MSVC_PACKAGES}/boost_program_options-vc${MSVC_TOOLSET_VERSION}/lib/native/libboost_program_options-vc${MSVC_TOOLSET_VERSION}-mt-gd-x64-*.lib")
+        file(GLOB DISKANN_BOOST_PROGRAM_OPTIONS_DLIB ${PROGRAM_OPTIONS_DLIB_PATTERN})
 
-    if (EXISTS ${DISKANN_BOOST_INCLUDE} AND EXISTS ${DISKANN_BOOST_PROGRAM_OPTIONS_LIB} AND EXISTS ${DISKANN_BOOST_PROGRAM_OPTIONS_DLIB})
-        set(Boost_FOUND ON)
-        set(Boost_INCLUDE_DIR ${DISKANN_BOOST_INCLUDE})
-        add_library(Boost::program_options STATIC IMPORTED)
-        set_target_properties(Boost::program_options PROPERTIES IMPORTED_LOCATION_RELEASE "${DISKANN_BOOST_PROGRAM_OPTIONS_LIB}")
-        set_target_properties(Boost::program_options PROPERTIES IMPORTED_LOCATION_DEBUG "${DISKANN_BOOST_PROGRAM_OPTIONS_DLIB}")
-        message(STATUS "Falling back to using Boost from the nuget package")
+        if (EXISTS ${DISKANN_BOOST_INCLUDE} AND EXISTS ${DISKANN_BOOST_PROGRAM_OPTIONS_LIB} AND EXISTS ${DISKANN_BOOST_PROGRAM_OPTIONS_DLIB})
+            set(Boost_FOUND ON)
+            set(Boost_INCLUDE_DIR ${DISKANN_BOOST_INCLUDE})
+            add_library(Boost::program_options STATIC IMPORTED)
+            set_target_properties(Boost::program_options PROPERTIES IMPORTED_LOCATION_RELEASE "${DISKANN_BOOST_PROGRAM_OPTIONS_LIB}")
+            set_target_properties(Boost::program_options PROPERTIES IMPORTED_LOCATION_DEBUG "${DISKANN_BOOST_PROGRAM_OPTIONS_DLIB}")
+            message(STATUS "Falling back to using Boost from the nuget package")
+        else()
+            message(WARNING "Couldn't find Boost. Was looking for ${DISKANN_BOOST_INCLUDE} and ${PROGRAM_OPTIONS_LIB_PATTERN}")
+        endif()
+    endif()
+
+    if (NOT Boost_FOUND)
+        message(FATAL_ERROR "Couldn't find Boost dependency")
+    endif()
+
+    include_directories(${Boost_INCLUDE_DIR})
+else()
+    # For PYBIND builds, we only need header-only boost components
+    # Try to find boost headers for dynamic_bitset (header-only)
+    if(NOT MSVC)
+        find_package(Boost QUIET)
+        if(NOT Boost_FOUND)
+            # Look for boost headers in common system locations
+            find_path(Boost_INCLUDE_DIR 
+                NAMES boost/dynamic_bitset.hpp
+                PATHS /usr/include /usr/local/include /opt/homebrew/include
+                NO_DEFAULT_PATH
+            )
+            if(Boost_INCLUDE_DIR)
+                set(Boost_FOUND ON)
+                message(STATUS "Found Boost headers at: ${Boost_INCLUDE_DIR}")
+            else()
+                # Use FetchContent to get boost headers if not found locally
+                message(STATUS "Boost headers not found locally, fetching via FetchContent...")
+                include(FetchContent)
+                FetchContent_Declare(
+                    boost
+                    URL https://github.com/boostorg/boost/releases/download/boost-1.82.0/boost-1.82.0.tar.gz
+                    URL_HASH SHA256=b62bd839ea6c28265af9a1f68393eda37fab5ec1d6f9e138de64e7a9cf198617
+                )
+                FetchContent_MakeAvailable(boost)
+                set(Boost_INCLUDE_DIR ${boost_SOURCE_DIR})
+                set(Boost_FOUND ON)
+                message(STATUS "Using fetched Boost headers at: ${Boost_INCLUDE_DIR}")
+            endif()
+        endif()
     else()
-        message(WARNING "Couldn't find Boost. Was looking for ${DISKANN_BOOST_INCLUDE} and ${PROGRAM_OPTIONS_LIB_PATTERN}")
+        # Windows - use nuget boost headers
+        set(DISKANN_BOOST_INCLUDE "${DISKANN_MSVC_PACKAGES}/boost/lib/native/include")
+        if (EXISTS ${DISKANN_BOOST_INCLUDE})
+            set(Boost_FOUND ON)
+            set(Boost_INCLUDE_DIR ${DISKANN_BOOST_INCLUDE})
+        endif()
+    endif()
+    
+    if(Boost_INCLUDE_DIR)
+        include_directories(${Boost_INCLUDE_DIR})
     endif()
 endif()
-
-if (NOT Boost_FOUND)
-    message(FATAL_ERROR "Couldn't find Boost dependency")
-endif()
-
-include_directories(${Boost_INCLUDE_DIR})
 
 #MKL Config
 if (MSVC)
