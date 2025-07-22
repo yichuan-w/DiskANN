@@ -262,6 +262,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     tsl::robin_map<uint32_t, std::vector<uint32_t>> _real_to_dummy_map;
     std::unordered_map<std::string, LabelT> _label_map;
 
+  public:
     // ZMQ port for embedding server communication (public for runtime updates)
     int _zmq_port = 5555; // Default ZMQ port
 
