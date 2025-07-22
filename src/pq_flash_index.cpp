@@ -233,20 +233,20 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
 #endif
 
     {
-        // 计算每个节点的分区偏移
+        // Calculate partition offset for each node
         std::vector<std::pair<uint64_t, uint64_t>> offsets(node_ids.size());
         std::vector<bool> valid_nodes(node_ids.size(), true);
 
-        // 按分区分组，减少重复读取相同分区
+        // Group nodes by partition to reduce duplicate reads of same partition
         std::map<uint32_t, std::vector<size_t>> partition_to_indices;
 
-        // 遍历所有节点，获取其分区信息
+        // Iterate over all nodes to get their partition info
         for (size_t i = 0; i < node_ids.size(); i++)
         {
             uint32_t node_id = node_ids[i];
             if (nbr_buffers[i].second != nullptr)
             {
-                // 使用read_neighbors中的逻辑获取分区ID
+                // Use read_neighbors logic to get partition ID
                 uint32_t partition_id = _id2partition[node_id];
                 if (partition_id >= _num_partitions)
                 {
@@ -255,21 +255,21 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
                     continue;
                 }
 
-                // 将节点按分区ID分组
+                // Group nodes by partition ID
                 partition_to_indices[partition_id].push_back(i);
             }
         }
 
-        // 对每个分区执行一次读取
+        // Read each partition once
         for (const auto &pair : partition_to_indices)
         {
             uint32_t partition_id = pair.first;
             const auto &indices = pair.second;
 
-            // 计算扇区偏移 (与read_neighbors中相同)
+            // Calculate sector offset (same as read_neighbors)
             uint64_t sector_offset = (partition_id + 1) * defaults::SECTOR_LEN;
 
-            // 读取分区扇区
+            // Read partition sector
             char *sector_buf = nullptr;
             alloc_aligned((void **)&sector_buf, defaults::SECTOR_LEN, defaults::SECTOR_LEN);
 
@@ -281,12 +281,12 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
             std::vector<AlignedRead> single_read = {read};
             graph_reader->read(single_read, ctx);
 
-            // 处理该分区中的所有节点
+            // Process all nodes in this partition
             for (size_t idx : indices)
             {
                 uint32_t node_id = node_ids[idx];
 
-                // 查找节点在分区内的位置 (与read_neighbors中相同)
+                // Find node's position in partition (same as read_neighbors)
                 const auto &part_list = _graph_partitions[partition_id];
                 auto it = std::find(part_list.begin(), part_list.end(), node_id);
                 if (it == part_list.end())
@@ -296,7 +296,7 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
                 }
                 size_t j = std::distance(part_list.begin(), it);
 
-                // 计算节点在扇区内的偏移 (与read_neighbors中相同)
+                // Calculate node's offset within sector (same as read_neighbors)
                 uint64_t node_offset = j * _graph_node_len;
                 if (node_offset + 4 > defaults::SECTOR_LEN)
                 {
@@ -304,11 +304,11 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
                     continue;
                 }
 
-                // 读取邻居数量
+                // Read neighbor count
                 char *adjacency_ptr = sector_buf + node_offset;
                 uint32_t neighbor_count = *reinterpret_cast<uint32_t *>(adjacency_ptr);
 
-                // 检查邻居数据是否超出扇区范围
+                // Check if neighbor data exceeds sector range
                 size_t needed = neighbor_count * sizeof(uint32_t);
                 if (node_offset + 4 + needed > defaults::SECTOR_LEN)
                 {
@@ -316,7 +316,7 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
                     continue;
                 }
 
-                // 拷贝邻居数据
+                // Copy neighbor data
                 nbr_buffers[idx].first = neighbor_count;
                 memcpy(nbr_buffers[idx].second, adjacency_ptr + 4, needed);
             }
@@ -1584,14 +1584,27 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
         return false;
     }
 
-    // 2. 使用线程本地(thread_local)的 Socket，实现连接复用
-    // 每个线程将拥有自己独立的、持久化的 Socket
+    // 2. Use thread-local (thread_local) Socket for connection reuse
+    // Each thread will have its own persistent Socket
     thread_local void *tl_socket = nullptr;
 
-    // 如果当前线程的 Socket 还未创建，则初始化并连接
+    // Thread-local cleanup helper
+    thread_local struct SocketCleanup
+    {
+        ~SocketCleanup()
+        {
+            if (tl_socket && g_zmq_context)
+            {
+                zmq_close(tl_socket);
+                tl_socket = nullptr;
+            }
+        }
+    } cleanup;
+
+    // If current thread's Socket is not created, initialize and connect
     if (tl_socket == nullptr)
     {
-        // 从全局 Context 创建 Socket
+        // Create Socket from global Context
         tl_socket = zmq_socket(g_zmq_context, ZMQ_REQ);
         if (!tl_socket)
         {
@@ -1599,7 +1612,7 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
             return false;
         }
 
-        int timeout = 30000; // 30 秒超时
+        int timeout = 300000; // 300 seconds timeout, same as embedding server
         zmq_setsockopt(tl_socket, ZMQ_RCVTIMEO, &timeout, sizeof(timeout));
         zmq_setsockopt(tl_socket, ZMQ_SNDTIMEO, &timeout, sizeof(timeout));
 
@@ -1609,21 +1622,21 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
             std::cerr << "ZMQ_FETCH_ERROR: zmq_connect() to " << endpoint << " failed: " << zmq_strerror(zmq_errno())
                       << "\n";
             zmq_close(tl_socket);
-            tl_socket = nullptr; // 重置为空指针，以便下次调用时可以尝试重建
+            tl_socket = nullptr; // Reset to nullptr for next call to try rebuilding
             return false;
         }
     }
 
-    // 3. 使用已建立的连接发送请求
+    // 3. Send request using established connection
     if (zmq_send(tl_socket, req_str.data(), req_str.size(), 0) < 0)
     {
         std::cerr << "ZMQ_FETCH_ERROR: zmq_send() failed: " << zmq_strerror(zmq_errno()) << "\n";
-        zmq_close(tl_socket); // 连接可能已失效，关闭它
-        tl_socket = nullptr;  // 重置，强制下次重建
+        zmq_close(tl_socket); // Connection may be invalid, close it
+        tl_socket = nullptr;  // Reset, force next rebuild
         return false;
     }
 
-    // 4. 接收响应
+    // 4. Receive response
     zmq_msg_t response_msg;
     zmq_msg_init(&response_msg);
     bool success = true;
@@ -1631,13 +1644,13 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
     if (zmq_msg_recv(&response_msg, tl_socket, 0) < 0)
     {
         std::cerr << "ZMQ_FETCH_ERROR: zmq_msg_recv() failed: " << zmq_strerror(zmq_errno()) << "\n";
-        zmq_close(tl_socket); // 同样，接收超时后连接也可能无效
-        tl_socket = nullptr;  // 重置，强制下次重建
+        zmq_close(tl_socket); // Same, connection may be invalid after timeout
+        tl_socket = nullptr;  // Reset, force next rebuild
         success = false;
     }
     else
     {
-        // 5. Protobuf 反序列化并提取数据
+        // 5. Protobuf deserialization and extract data
         protoembedding::NodeEmbeddingResponse resp_proto;
         if (!resp_proto.ParseFromArray(zmq_msg_data(&response_msg), static_cast<int>(zmq_msg_size(&response_msg))))
         {
@@ -1682,7 +1695,7 @@ bool fetch_embeddings_zmq(const std::vector<uint32_t> &node_ids, std::vector<std
         }
     }
 
-    // 6. 清理消息对象，但保持 Socket 和 Context 开放以备下次复用
+    // 6. Clean up message object, but keep Socket and Context open for next reuse
     zmq_msg_close(&response_msg);
 
     return success;
@@ -1902,7 +1915,10 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
                 // If all distances are cached, we can return early
                 if (node_ids.empty())
+                {
+                    // All distances were served from cache, no need to fetch embeddings
                     return;
+                }
             }
             else
             {
@@ -2643,6 +2659,13 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         for (auto &nr : full_retset)
         {
             node_ids.push_back(nr.id);
+        }
+
+        // Check if we have any nodes to fetch embeddings for
+        if (node_ids.empty())
+        {
+            diskann::cout << "No nodes to fetch embeddings for, skipping..." << std::endl;
+            return;
         }
 
         Timer fetch_timer;

@@ -279,7 +279,7 @@ void AppleAlignedFileReader::open(const std::string &fname)
 
 void AppleAlignedFileReader::close()
 {
-    diskann::cout << "close called on instance " << this << std::endl;
+    // diskann::cout << "close called on instance " << this << std::endl;
 
     // Clear all thread contexts
     deregister_all_threads();
