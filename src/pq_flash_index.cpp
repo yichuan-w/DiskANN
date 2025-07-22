@@ -90,7 +90,7 @@ template <typename T, typename LabelT> PQFlashIndex<T, LabelT>::~PQFlashIndex()
 
     if (_load_flag)
     {
-        diskann::cout << "Clearing scratch" << std::endl;
+        // diskann::cout << "Clearing scratch" << std::endl;
         ScratchStoreManager<SSDThreadData<T>> manager(this->_thread_data);
         manager.destroy();
         this->reader->deregister_all_threads();
@@ -139,7 +139,7 @@ template <typename T, typename LabelT> inline T *PQFlashIndex<T, LabelT>::offset
 template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::setup_thread_data(uint64_t nthreads, uint64_t visited_reserve)
 {
-    diskann::cout << "Setting up thread-specific contexts for nthreads: " << nthreads << std::endl;
+    // diskann::cout << "Setting up thread-specific contexts for nthreads: " << nthreads << std::endl;
 // omp parallel for to generate unique thread IDs
 #pragma omp parallel for num_threads((int)nthreads)
     for (int64_t thread = 0; thread < (int64_t)nthreads; thread++)
