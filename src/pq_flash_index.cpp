@@ -1768,7 +1768,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     // diskann::cout << "cached_beam_search" << std::endl;
     // diskann out prune_ratio
     prune_ratio = 1 - prune_ratio;
-    diskann::cout << "reserve ratio: " << prune_ratio << std::endl;
+    // diskann::cout << "reserve ratio: " << prune_ratio << std::endl;
     // prune_ratio = 0.8;
     uint64_t num_sector_per_nodes = DIV_ROUND_UP(_max_node_len, defaults::SECTOR_LEN);
     if (beam_width > num_sector_per_nodes * defaults::MAX_N_SECTOR_READS)
@@ -2632,7 +2632,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
     delete[] batched_dists;
 
-    diskann::cout << "Graph traversal completed, hops: " << hops << std::endl;
+    // diskann::cout << "Graph traversal completed, hops: " << hops << std::endl;
 
     if (USE_DEFERRED_FETCH)
     {

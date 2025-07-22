@@ -57,6 +57,10 @@ template <typename DT> class StaticDiskIndex
         bool skip_search_reorder = false, bool recompute_beighbor_embeddings = false, bool dedup_node_dis = false,
         float prune_ratio = 0, bool batch_recompute = false, bool global_pruning = false);
 
+    // ZMQ port access methods
+    int get_zmq_port() const;
+    void set_zmq_port(int port);
+
   private:
     std::shared_ptr<AlignedFileReader> _reader;
     std::shared_ptr<AlignedFileReader> _graph_reader;

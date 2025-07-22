@@ -117,6 +117,18 @@ NeighborsAndDistances<StaticIdType> StaticDiskIndex<DT>::batch_search(
     return std::make_pair(ids, dists);
 }
 
+template <typename DT>
+int StaticDiskIndex<DT>::get_zmq_port() const
+{
+    return _index._zmq_port;
+}
+
+template <typename DT>
+void StaticDiskIndex<DT>::set_zmq_port(int port)
+{
+    _index._zmq_port = port;
+}
+
 template class StaticDiskIndex<float>;
 template class StaticDiskIndex<uint8_t>;
 template class StaticDiskIndex<int8_t>;
