@@ -32,7 +32,11 @@ option(PYBIND "Build with Python bindings" ON)
 
 if(PYBIND)
     # Find Python
-    find_package(Python 3.6 COMPONENTS Interpreter Development REQUIRED)
+    # Try Development.Module first (for manylinux), fallback to Development
+    find_package(Python 3.6 COMPONENTS Interpreter Development.Module)
+    if(NOT Python_FOUND)
+        find_package(Python 3.6 COMPONENTS Interpreter Development REQUIRED)
+    endif()
     execute_process(
         COMMAND "${Python_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
         OUTPUT_VARIABLE pybind11_DIR
