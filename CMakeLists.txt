@@ -473,6 +473,9 @@ if(PYBIND)
     )
 
 endif()
+
+# Add graph partition tools
+add_subdirectory(graph_partition)
 ###############################################################################
 # ZLIB SECTION - Use submodule
 ###############################################################################
