@@ -1222,7 +1222,8 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
         throw diskann::ANNException(stream.str(), -1, __FUNCSIG__, __FILE__, __LINE__);
     }
 
-    std::string disk_pq_pivots_path = this->_disk_index_file + "_pq_pivots.bin";
+    // In partition mode, use the correct PQ path that wasn't derived from deleted disk index
+    std::string disk_pq_pivots_path = _use_partition ? pq_table_bin : (this->_disk_index_file + "_pq_pivots.bin");
 #ifdef EXEC_ENV_OLS
     if (files.fileExists(disk_pq_pivots_path))
     {
@@ -1252,23 +1253,28 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
     // DiskPriorityIO class. So, we need to estimate how many
     // bytes are needed to store the header and read in that many using our
     // 'standard' aligned file reader approach.
-    reader->open(_disk_index_file);
-    this->setup_thread_data(num_threads);
-    this->_max_nthreads = num_threads;
+    if (!_use_partition)
+    {
+        reader->open(_disk_index_file);
+        this->setup_thread_data(num_threads);
+        this->_max_nthreads = num_threads;
 
-    char *bytes = getHeaderBytes();
-    ContentBuf buf(bytes, HEADER_SIZE);
-    std::basic_istream<char> index_metadata(&buf);
+        char *bytes = getHeaderBytes();
+        ContentBuf buf(bytes, HEADER_SIZE);
+        std::basic_istream<char> index_metadata(&buf);
+    }
 #else
-    diskann::cout << "Loading index metadata from " << _disk_index_file << std::endl;
-    std::ifstream index_metadata(_disk_index_file, std::ios::binary);
+    std::ifstream index_metadata;
+    if (!_use_partition)
+    {
+        diskann::cout << "Loading index metadata from " << _disk_index_file << std::endl;
+        index_metadata.open(_disk_index_file, std::ios::binary);
+    }
 #endif
 
     size_t medoid_id_on_file;
-#if 1
     if (!_use_partition)
     {
-#endif
         if (!index_metadata.is_open())
         {
             diskann::cout << "Error: Could not open index metadata file: " << _disk_index_file << std::endl;
@@ -1341,7 +1347,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
 #ifdef EXEC_ENV_OLS
         delete[] bytes;
 #else
-    index_metadata.close();
+        index_metadata.close();
 #endif
 
 #ifndef EXEC_ENV_OLS
@@ -1353,10 +1359,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
                       << ", max node len: " << _max_node_len << ", max node degree: " << _max_degree << std::endl;
 
 #endif
-
-#if 1
     }
-#endif
 
     this->setup_thread_data(num_threads);
     this->_max_nthreads = num_threads;
@@ -1427,7 +1430,12 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
         use_medoids_data_as_centroids();
     }
 
-    std::string norm_file = std::string(_disk_index_file) + "_max_base_norm.bin";
+    // In partition mode, construct norm file path from the base prefix used for PQ files
+    std::string base_prefix =
+        _use_partition ? pq_table_bin.substr(0, pq_table_bin.find("_pq_pivots.bin")) : _disk_index_file;
+    // In partition mode, the norm file should use the disk index naming convention
+    std::string norm_file =
+        _use_partition ? (base_prefix + "_disk.index_max_base_norm.bin") : (base_prefix + "_max_base_norm.bin");
 
 #ifdef EXEC_ENV_OLS
     if (files.fileExists(norm_file) && metric == diskann::Metric::INNER_PRODUCT)

@@ -671,6 +671,51 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
         }
         _index.save(mem_index_path.c_str());
 
+        // Generate separate medoids and centroids files for partition compatibility
+        try
+        {
+            // Read the real medoid from the just-saved memory index
+            uint32_t real_medoid_id = 0;
+            std::ifstream mem_index_reader(mem_index_path, std::ios::binary);
+            if (mem_index_reader.is_open())
+            {
+                // Skip file size and width
+                mem_index_reader.seekg(sizeof(uint64_t) + sizeof(uint32_t), std::ios::beg);
+                // Read the actual medoid from the memory index
+                mem_index_reader.read((char *)&real_medoid_id, sizeof(uint32_t));
+                mem_index_reader.close();
+                diskann::cout << "Read real medoid ID " << real_medoid_id << " from memory index" << std::endl;
+            }
+            else
+            {
+                diskann::cout << "Warning: Could not read medoid from memory index, using default" << std::endl;
+            }
+
+            // Create medoids file for single-shot build with real medoid
+            std::ofstream medoid_writer(medoids_file.c_str(), std::ios::binary);
+            if (medoid_writer.is_open())
+            {
+                uint32_t nshards = 1; // Single shot build has 1 shard
+                uint32_t one_val = 1;
+                medoid_writer.write((char *)&nshards, sizeof(uint32_t));
+                medoid_writer.write((char *)&one_val, sizeof(uint32_t));
+
+                // Write the real medoid ID read from memory index
+                medoid_writer.write((char *)&real_medoid_id, sizeof(uint32_t));
+                medoid_writer.close();
+                diskann::cout << "Generated medoids file with real medoid ID " << real_medoid_id << ": " << medoids_file
+                              << std::endl;
+            }
+
+            // Don't create empty centroids file - let pq_flash_index.cpp handle missing file
+            // by calling use_medoids_data_as_centroids() automatically
+            diskann::cout << "Skipped centroids file generation - will use medoid data as centroids" << std::endl;
+        }
+        catch (...)
+        {
+            diskann::cout << "Warning: Failed to generate medoids/centroids files for partition mode" << std::endl;
+        }
+
         if (use_filters)
         {
             // need to copy the labels_to_medoids file to the specified input
@@ -681,8 +726,10 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
             std::remove(mem_labels_to_medoid_file.c_str());
         }
 
-        std::remove(medoids_file.c_str());
-        std::remove(centroids_file.c_str());
+        // Don't delete medoids and centroids files - they may be needed for partition mode
+        // and are not large files anyway
+        // std::remove(medoids_file.c_str());  // Keep for partition compatibility
+        // std::remove(centroids_file.c_str()); // Keep for partition compatibility
         return 0;
     }
 

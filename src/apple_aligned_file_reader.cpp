@@ -260,8 +260,13 @@ void AppleAlignedFileReader::open(const std::string &fname)
     this->file_desc = ::open(fname.c_str(), O_RDONLY);
     if (this->file_desc == -1)
     {
-        diskann::cerr << "Failed to open file: " << fname << ", errno=" << errno << std::endl;
-        throw std::runtime_error("Failed to open file"); // File open failure is fatal
+        diskann::cerr << "💥 DETAILED FILE OPEN FAILURE:" << std::endl;
+        diskann::cerr << "   File: " << fname << std::endl;
+        diskann::cerr << "   Errno: " << errno << " (" << strerror(errno) << ")" << std::endl;
+        diskann::cerr << "   File exists: " << (access(fname.c_str(), F_OK) == 0 ? "YES" : "NO") << std::endl;
+        diskann::cerr << "   File readable: " << (access(fname.c_str(), R_OK) == 0 ? "YES" : "NO") << std::endl;
+        throw std::runtime_error(std::string("Failed to open file: ") + fname + " (errno=" + std::to_string(errno) +
+                                 ")");
     }
 
     // Get file info
