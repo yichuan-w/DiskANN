@@ -359,8 +359,8 @@ template <typename T> float DistanceInnerProduct<T>::inner_product(const T *a, c
     uint32_t D = (size + 3) & ~3U;
     uint32_t DR = D % 16;
     uint32_t DD = D - DR;
-    const float *l = a;
-    const float *r = b;
+    const float *l = (float *)a;
+    const float *r = (float *)b;
     const float *e_l = l + DD;
     const float *e_r = r + DD;
     float unpack[4] __attribute__((aligned(16))) = {0, 0, 0, 0};
