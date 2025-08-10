@@ -1336,7 +1336,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     if (num_threads != 0)
     {
         omp_set_num_threads(num_threads);
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__APPLE__)
         mkl_set_num_threads(num_threads);
 #endif
     }
