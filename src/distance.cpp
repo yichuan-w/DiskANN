@@ -472,7 +472,7 @@ template <typename T> float DistanceFastL2<T>::norm(const T *a, uint32_t size) c
     uint32_t D = (size + 3) & ~3U;
     uint32_t DR = D % 16;
     uint32_t DD = D - DR;
-    const float *l = a;
+    const float *l = (float *)a;
     const float *e_l = l + DD;
     float unpack[4] __attribute__((aligned(16))) = {0, 0, 0, 0};
 
