@@ -137,12 +137,36 @@ elseif(APPLE)
         ERROR_QUIET
     )
     
-    # Force use of Homebrew libomp (same as HNSW backend approach)
-    set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
-    set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
-    set(OpenMP_C_LIB_NAMES "omp")
-    set(OpenMP_CXX_LIB_NAMES "omp")
-    set(OpenMP_omp_LIBRARY "/opt/homebrew/opt/libomp/lib/libomp.dylib")
+    # Use Homebrew libomp with auto-detected path
+    # First try to get path from CMAKE_PREFIX_PATH or OpenMP_ROOT environment variable
+    if(DEFINED ENV{OpenMP_ROOT})
+        set(HOMEBREW_LIBOMP_ROOT "$ENV{OpenMP_ROOT}")
+    elseif(DEFINED ENV{CMAKE_PREFIX_PATH})
+        set(HOMEBREW_LIBOMP_ROOT "$ENV{CMAKE_PREFIX_PATH}/opt/libomp")
+    else()
+        # Fallback: auto-detect Homebrew prefix
+        execute_process(COMMAND brew --prefix libomp
+            OUTPUT_VARIABLE HOMEBREW_LIBOMP_ROOT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+    endif()
+    
+    if(HOMEBREW_LIBOMP_ROOT AND EXISTS "${HOMEBREW_LIBOMP_ROOT}/lib/libomp.dylib")
+        set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I${HOMEBREW_LIBOMP_ROOT}/include")
+        set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I${HOMEBREW_LIBOMP_ROOT}/include")
+        set(OpenMP_C_LIB_NAMES "omp")
+        set(OpenMP_CXX_LIB_NAMES "omp")
+        set(OpenMP_omp_LIBRARY "${HOMEBREW_LIBOMP_ROOT}/lib/libomp.dylib")
+        message(STATUS "Using Homebrew libomp from: ${HOMEBREW_LIBOMP_ROOT}")
+    else()
+        # Fallback to old hardcoded path for backwards compatibility
+        set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+        set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+        set(OpenMP_C_LIB_NAMES "omp")
+        set(OpenMP_CXX_LIB_NAMES "omp")
+        set(OpenMP_omp_LIBRARY "/opt/homebrew/opt/libomp/lib/libomp.dylib")
+        message(WARNING "Using fallback hardcoded path: /opt/homebrew/opt/libomp")
+    endif()
     
     find_package(OpenMP REQUIRED)
     
@@ -150,7 +174,7 @@ elseif(APPLE)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
         link_libraries(OpenMP::OpenMP_CXX)
-        message(STATUS "OpenMP configured with Homebrew libomp (forced path)")
+        message(STATUS "OpenMP configured with Homebrew libomp")
     else()
         message(FATAL_ERROR "OpenMP not found. Please install with: brew install libomp")
     endif()
