@@ -309,32 +309,15 @@ else()
     link_directories(${MKL_PATH})
     include_directories(${MKL_INCLUDE_PATH})
 
-    # compile flags and link libraries 
+    # compile flags 
     # if gcc/g++
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         add_compile_options(-m64 -Wl,--no-as-needed)
     endif()
-    if (NOT PYBIND)
-        link_libraries(mkl_intel_ilp64 mkl_intel_thread mkl_core iomp5 pthread m dl)
-    else()
-        # static linking for python so as to minimize customer dependency issues
-        if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-            # In debug mode, use dynamic linking to ensure all symbols are available
-            link_libraries(mkl_intel_ilp64 mkl_intel_thread mkl_core ${MKL_DEF_SO} iomp5 pthread m dl)
-        else()
-            # In release mode, use static linking to minimize dependencies
-            link_libraries(
-                    ${MKL_PATH}/libmkl_intel_ilp64.a
-                    ${MKL_PATH}/libmkl_intel_thread.a
-                    ${MKL_PATH}/libmkl_core.a
-                    ${MKL_DEF_SO}
-                    iomp5
-                    pthread
-                    m
-                    dl
-            )
-        endif()
-    endif()
+    
+    # Define MKL libraries for target-specific linking (avoids contaminating all targets)
+    # Use dynamic linking with mkl_rt - simpler, more reliable, works across platforms
+    set(_MKL_LIBS mkl_rt iomp5 pthread m dl)
 
     add_definitions(-DMKL_ILP64)
 endif()
@@ -500,6 +483,7 @@ endif()
 
 # Add graph partition tools
 add_subdirectory(graph_partition)
+
 ###############################################################################
 # ZLIB SECTION - Use submodule
 ###############################################################################
@@ -588,3 +572,53 @@ add_definitions(-DUSE_ZEROMQ)
 
 target_link_libraries(diskann ${PYBIND11_LIBRARIES})
 target_link_libraries(diskann_s ${PYBIND11_LIBRARIES})
+
+###############################################################################
+# MKL LINKING - Apply to specific targets (after all targets are defined)
+###############################################################################
+if(UNIX AND NOT APPLE)
+    # Helper function to link MKL libraries to targets that need mathematical operations
+    function(link_mkl_if_target_exists target_name)
+        if(TARGET ${target_name})
+            target_link_libraries(${target_name} PRIVATE ${_MKL_LIBS})
+            message(STATUS "Linked MKL to target: ${target_name}")
+        endif()
+    endfunction()
+    
+    message(STATUS "Applying MKL linking with dynamic libraries: ${_MKL_LIBS}")
+    
+    # Core libraries
+    link_mkl_if_target_exists(diskann)
+    link_mkl_if_target_exists(diskann_s)
+    
+    # Graph partition tools
+    link_mkl_if_target_exists(partitioner)
+    link_mkl_if_target_exists(index_relayout)
+    
+    # Main applications (these definitely use DiskANN math operations)
+    link_mkl_if_target_exists(build_memory_index)
+    link_mkl_if_target_exists(build_stitched_index)
+    link_mkl_if_target_exists(search_memory_index)
+    link_mkl_if_target_exists(build_disk_index)
+    link_mkl_if_target_exists(search_disk_index)
+    link_mkl_if_target_exists(range_search_disk_index)
+    link_mkl_if_target_exists(test_streaming_scenario)
+    link_mkl_if_target_exists(test_insert_deletes_consolidate)
+    
+    # Utilities that perform mathematical operations
+    link_mkl_if_target_exists(compute_groundtruth)
+    link_mkl_if_target_exists(compute_groundtruth_for_filters)
+    link_mkl_if_target_exists(calculate_recall)
+    link_mkl_if_target_exists(vector_analysis)
+    link_mkl_if_target_exists(simulate_aggregate_recall)
+    
+    # REST API servers
+    link_mkl_if_target_exists(inmem_server)
+    link_mkl_if_target_exists(ssd_server)
+    link_mkl_if_target_exists(multiple_ssdindex_server)
+    
+    # Python extension if built
+    link_mkl_if_target_exists(_diskannpy)
+    
+    message(STATUS "MKL linking configuration completed")
+endif()
