@@ -3309,7 +3309,7 @@ void Index<T, TagT, LabelT>::search_with_optimized_layout(const T *query, size_t
         uint32_t id = init_ids[i];
         if (id >= _nd)
             continue;
-        _mm_prefetch(_opt_graph + _node_size * id, _MM_HINT_T0);
+        DISKANN_PREFETCH_T0(_opt_graph + _node_size * id);
     }
     L = 0;
     for (uint32_t i = 0; i < init_ids.size(); i++)
@@ -3330,12 +3330,12 @@ void Index<T, TagT, LabelT>::search_with_optimized_layout(const T *query, size_t
     {
         auto nbr = retset.closest_unexpanded();
         auto n = nbr.id;
-        _mm_prefetch(_opt_graph + _node_size * n + _data_len, _MM_HINT_T0);
+        DISKANN_PREFETCH_T0(_opt_graph + _node_size * n + _data_len);
         neighbors = (uint32_t *)(_opt_graph + _node_size * n + _data_len);
         uint32_t MaxM = *neighbors;
         neighbors++;
         for (uint32_t m = 0; m < MaxM; ++m)
-            _mm_prefetch(_opt_graph + _node_size * neighbors[m], _MM_HINT_T0);
+            DISKANN_PREFETCH_T0(_opt_graph + _node_size * neighbors[m]);
         for (uint32_t m = 0; m < MaxM; ++m)
         {
             uint32_t id = neighbors[m];

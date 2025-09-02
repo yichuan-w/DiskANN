@@ -301,10 +301,10 @@ void aggregate_coords(const std::vector<uint32_t> &ids, const uint8_t *all_coord
 void pq_dist_lookup(const uint8_t *pq_ids, const size_t n_pts, const size_t pq_nchunks, const float *pq_dists,
                     std::vector<float> &dists_out)
 {
-    //_mm_prefetch((char*) dists_out, _MM_HINT_T0);
-    _mm_prefetch((char *)pq_ids, _MM_HINT_T0);
-    _mm_prefetch((char *)(pq_ids + 64), _MM_HINT_T0);
-    _mm_prefetch((char *)(pq_ids + 128), _MM_HINT_T0);
+    //DISKANN_PREFETCH_T0((char*) dists_out);
+    DISKANN_PREFETCH_T0((char *)pq_ids);
+    DISKANN_PREFETCH_T0((char *)(pq_ids + 64));
+    DISKANN_PREFETCH_T0((char *)(pq_ids + 128));
     dists_out.clear();
     dists_out.resize(n_pts, 0);
     for (size_t chunk = 0; chunk < pq_nchunks; chunk++)
@@ -312,7 +312,7 @@ void pq_dist_lookup(const uint8_t *pq_ids, const size_t n_pts, const size_t pq_n
         const float *chunk_dists = pq_dists + 256 * chunk;
         if (chunk < pq_nchunks - 1)
         {
-            _mm_prefetch((char *)(chunk_dists + 256), _MM_HINT_T0);
+            DISKANN_PREFETCH_T0((char *)(chunk_dists + 256));
         }
         for (size_t idx = 0; idx < n_pts; idx++)
         {
@@ -336,17 +336,17 @@ void aggregate_coords(const uint32_t *ids, const uint64_t n_ids, const uint8_t *
 void pq_dist_lookup(const uint8_t *pq_ids, const size_t n_pts, const size_t pq_nchunks, const float *pq_dists,
                     float *dists_out)
 {
-    _mm_prefetch((char *)dists_out, _MM_HINT_T0);
-    _mm_prefetch((char *)pq_ids, _MM_HINT_T0);
-    _mm_prefetch((char *)(pq_ids + 64), _MM_HINT_T0);
-    _mm_prefetch((char *)(pq_ids + 128), _MM_HINT_T0);
+    DISKANN_PREFETCH_T0((char *)dists_out);
+    DISKANN_PREFETCH_T0((char *)pq_ids);
+    DISKANN_PREFETCH_T0((char *)(pq_ids + 64));
+    DISKANN_PREFETCH_T0((char *)(pq_ids + 128));
     memset(dists_out, 0, n_pts * sizeof(float));
     for (size_t chunk = 0; chunk < pq_nchunks; chunk++)
     {
         const float *chunk_dists = pq_dists + 256 * chunk;
         if (chunk < pq_nchunks - 1)
         {
-            _mm_prefetch((char *)(chunk_dists + 256), _MM_HINT_T0);
+            DISKANN_PREFETCH_T0((char *)(chunk_dists + 256));
         }
         for (size_t idx = 0; idx < n_pts; idx++)
         {

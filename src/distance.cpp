@@ -199,8 +199,8 @@ float DistanceL2Float::compare(const float *a, const float *b, uint32_t size) co
         // load a_vec
         if (j < (niters - 1))
         {
-            _mm_prefetch((char *)(a + 8 * (j + 1)), _MM_HINT_T0);
-            _mm_prefetch((char *)(b + 8 * (j + 1)), _MM_HINT_T0);
+            DISKANN_PREFETCH_T0((char *)(a + 8 * (j + 1)));
+            DISKANN_PREFETCH_T0((char *)(b + 8 * (j + 1)));
         }
         __m256 a_vec = _mm256_load_ps(a + 8 * j);
         // load b_vec

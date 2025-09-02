@@ -23,6 +23,24 @@ typedef int FileHandle;
 
 #include "distance.h"
 #include "logger.h"
+
+// Cross-platform prefetch support
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86) || defined(_WINDOWS)
+  // x86 platforms - use Intel intrinsics
+  #ifndef _WINDOWS
+    #include <xmmintrin.h>  // For _mm_prefetch
+  #endif
+  #define DISKANN_PREFETCH_T0(ptr) _mm_prefetch((const char*)(ptr), _MM_HINT_T0)
+  #define DISKANN_PREFETCH_T1(ptr) _mm_prefetch((const char*)(ptr), _MM_HINT_T1)
+#elif defined(__GNUC__) || defined(__clang__)
+  // ARM64 and other GCC/Clang supported platforms - use builtin
+  #define DISKANN_PREFETCH_T0(ptr) __builtin_prefetch((const void*)(ptr), 0, 3)
+  #define DISKANN_PREFETCH_T1(ptr) __builtin_prefetch((const void*)(ptr), 0, 2)
+#else
+  // No prefetch support
+  #define DISKANN_PREFETCH_T0(ptr) ((void)0)
+  #define DISKANN_PREFETCH_T1(ptr) ((void)0)
+#endif
 #include "cached_io.h"
 #include "ann_exception.h"
 #include "windows_customizations.h"
@@ -1192,39 +1210,17 @@ inline void copy_aligned_data_from_file(const char *bin_file, T *&data, size_t &
 // NOTE :: good efficiency when total_vec_size is integral multiple of 64
 inline void prefetch_vector(const char *vec, size_t vecsize)
 {
-#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
     size_t max_prefetch_size = (vecsize / 64) * 64;
     for (size_t d = 0; d < max_prefetch_size; d += 64)
-        _mm_prefetch((const char *)vec + d, _MM_HINT_T0);
-#elif defined(__GNUC__) || defined(__clang__)
-    // Use compiler builtin prefetch on ARM64 and other architectures
-    size_t max_prefetch_size = (vecsize / 64) * 64;
-    for (size_t d = 0; d < max_prefetch_size; d += 64)
-        __builtin_prefetch((const char *)vec + d, 0, 3);  // 0=read, 3=high temporal locality
-#else
-    // No prefetch available - compiler may optimize automatically
-    (void)vec;
-    (void)vecsize;
-#endif
+        DISKANN_PREFETCH_T0(vec + d);
 }
 
 // NOTE :: good efficiency when total_vec_size is integral multiple of 64
 inline void prefetch_vector_l2(const char *vec, size_t vecsize)
 {
-#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
     size_t max_prefetch_size = (vecsize / 64) * 64;
     for (size_t d = 0; d < max_prefetch_size; d += 64)
-        _mm_prefetch((const char *)vec + d, _MM_HINT_T1);
-#elif defined(__GNUC__) || defined(__clang__)
-    // Use compiler builtin prefetch on ARM64 and other architectures
-    size_t max_prefetch_size = (vecsize / 64) * 64;
-    for (size_t d = 0; d < max_prefetch_size; d += 64)
-        __builtin_prefetch((const char *)vec + d, 0, 2);  // 0=read, 2=moderate temporal locality
-#else
-    // No prefetch available - compiler may optimize automatically
-    (void)vec;
-    (void)vecsize;
-#endif
+        DISKANN_PREFETCH_T1(vec + d);
 }
 
 // NOTE: Implementation in utils.cpp.
