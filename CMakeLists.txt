@@ -339,6 +339,23 @@ else()
             endif()
         endif()
         
+        # Add common LAPACKE header paths as fallback
+        set(COMMON_LAPACKE_PATHS 
+            /usr/include/openblas
+            /usr/include/lapacke
+            /usr/local/include/openblas
+            /usr/local/include/lapacke
+            /opt/OpenBLAS/include
+        )
+        
+        foreach(path ${COMMON_LAPACKE_PATHS})
+            if(EXISTS "${path}/lapacke.h")
+                include_directories(${path})
+                message(STATUS "Found LAPACKE header at: ${path}")
+                break()
+            endif()
+        endforeach()
+        
         message(STATUS "Using BLAS libraries: ${BLAS_LIBRARIES}")
         message(STATUS "Using LAPACK libraries: ${LAPACK_LIBRARIES}")
     endif()
