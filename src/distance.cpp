@@ -503,23 +503,23 @@ template <typename T> float DistanceFastL2<T>::norm(const T *a, uint32_t size) c
     vDSP_dotpr((float *)a, 1, (float *)a, 1, &result, size);
 #else
     float dot0, dot1, dot2, dot3;
-    const float *last = a + size;
-    const float *unroll_group = last - 3;
+    const T *last = a + size;
+    const T *unroll_group = last - 3;
 
     /* Process 4 items with each loop for efficiency. */
     while (a < unroll_group)
     {
-        dot0 = a[0] * a[0];
-        dot1 = a[1] * a[1];
-        dot2 = a[2] * a[2];
-        dot3 = a[3] * a[3];
+        dot0 = (float)a[0] * (float)a[0];
+        dot1 = (float)a[1] * (float)a[1];
+        dot2 = (float)a[2] * (float)a[2];
+        dot3 = (float)a[3] * (float)a[3];
         result += dot0 + dot1 + dot2 + dot3;
         a += 4;
     }
     /* Process last 0-3 pixels.  Not needed for standard vector lengths. */
     while (a < last)
     {
-        result += (*a) * (*a);
+        result += (float)(*a) * (float)(*a);
         a++;
     }
 #endif
