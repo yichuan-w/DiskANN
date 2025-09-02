@@ -323,7 +323,15 @@ else()
         find_package(LAPACK REQUIRED)
         
         # Define fallback libraries for target-specific linking
-        set(_BLAS_LIBS ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} pthread m dl)
+        # Try to find LAPACKE library for LAPACK C interface
+        find_library(LAPACKE_LIBRARY NAMES lapacke PATHS /usr/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu /usr/local/lib)
+        if(LAPACKE_LIBRARY)
+            set(_BLAS_LIBS ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${LAPACKE_LIBRARY} pthread m dl)
+            message(STATUS "Found LAPACKE library: ${LAPACKE_LIBRARY}")
+        else()
+            set(_BLAS_LIBS ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} pthread m dl)
+            message(WARNING "LAPACKE library not found, LAPACK C interface may not work")
+        endif()
         
         # Add OpenBLAS-specific definitions to mimic MKL interface
         add_definitions(-DUSE_OPENBLAS)
@@ -343,9 +351,12 @@ else()
         set(COMMON_LAPACKE_PATHS 
             /usr/include/openblas
             /usr/include/lapacke
+            /usr/include/aarch64-linux-gnu/openblas
+            /usr/include/x86_64-linux-gnu/openblas  
             /usr/local/include/openblas
             /usr/local/include/lapacke
             /opt/OpenBLAS/include
+            /usr/include
         )
         
         foreach(path ${COMMON_LAPACKE_PATHS})
