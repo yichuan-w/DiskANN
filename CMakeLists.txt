@@ -329,6 +329,16 @@ else()
         add_definitions(-DUSE_OPENBLAS)
         set(DISKANN_USE_MKL OFF)
         
+        # Find LAPACKE package for header files
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(LAPACKE QUIET lapacke)
+            if(LAPACKE_FOUND)
+                include_directories(${LAPACKE_INCLUDE_DIRS})
+                message(STATUS "Found LAPACKE headers: ${LAPACKE_INCLUDE_DIRS}")
+            endif()
+        endif()
+        
         message(STATUS "Using BLAS libraries: ${BLAS_LIBRARIES}")
         message(STATUS "Using LAPACK libraries: ${LAPACK_LIBRARIES}")
     endif()
