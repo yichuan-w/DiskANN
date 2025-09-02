@@ -438,7 +438,18 @@ elseif(APPLE)
     endif()
 else()
     set(ENV{TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD} 500000000000)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma -msse2 -ftree-vectorize -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DUSE_AVX2 -fPIC")
+    
+    # Set architecture-specific compiler flags
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+        # ARM64 Linux - use NEON and other ARM-specific optimizations
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftree-vectorize -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -fPIC")
+        message(STATUS "Using ARM64 optimizations for Linux")
+    else()
+        # x86_64 Linux - use AVX2 and x86 SIMD optimizations
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma -msse2 -ftree-vectorize -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DUSE_AVX2 -fPIC")
+        message(STATUS "Using x86_64 optimizations for Linux")
+    endif()
+    
     if(USE_TCMALLOC)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free")
     endif()
