@@ -393,16 +393,16 @@ template <typename T> float DistanceInnerProduct<T>::inner_product(const T *a, c
 #else
 
     float dot0, dot1, dot2, dot3;
-    const float *last = a + size;
-    const float *unroll_group = last - 3;
+    const T *last = a + size;
+    const T *unroll_group = last - 3;
 
     /* Process 4 items with each loop for efficiency. */
     while (a < unroll_group)
     {
-        dot0 = a[0] * b[0];
-        dot1 = a[1] * b[1];
-        dot2 = a[2] * b[2];
-        dot3 = a[3] * b[3];
+        dot0 = (float)a[0] * (float)b[0];
+        dot1 = (float)a[1] * (float)b[1];
+        dot2 = (float)a[2] * (float)b[2];
+        dot3 = (float)a[3] * (float)b[3];
         result += dot0 + dot1 + dot2 + dot3;
         a += 4;
         b += 4;
@@ -410,7 +410,7 @@ template <typename T> float DistanceInnerProduct<T>::inner_product(const T *a, c
     /* Process last 0-3 pixels.  Not needed for standard vector lengths. */
     while (a < last)
     {
-        result += *a++ * *b++;
+        result += (float)(*a++) * (float)(*b++);
     }
 #endif
 #endif
