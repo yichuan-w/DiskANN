@@ -1,5 +1,6 @@
 #pragma once
 
+#if defined(_WINDOWS) || (defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86))
 #ifdef _WINDOWS
 #include <immintrin.h>
 #include <smmintrin.h>
@@ -8,9 +9,11 @@
 #else
 #include <immintrin.h>
 #endif
+#endif
 
 namespace diskann
 {
+#if defined(_WINDOWS) || (defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86))
 static inline __m256 _mm256_mul_epi8(__m256i X)
 {
     __m256i zero = _mm256_setzero_si256();
@@ -103,4 +106,5 @@ static inline float _mm256_reduce_add_ps(__m256 x)
     /* Conversion to float is a no-op on x86-64 */
     return _mm_cvtss_f32(x32);
 }
+#endif // x86 SIMD functions
 } // namespace diskann

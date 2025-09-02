@@ -10,9 +10,11 @@
 #include "simd_utils.h"
 #elif __APPLE__
 #include <Accelerate/Accelerate.h>
-#else
+#elif defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
 #include <immintrin.h>
 #include "simd_utils.h"
+#else
+// ARM64 and other architectures - no x86 intrinsics available
 #endif
 
 #include <iostream>
