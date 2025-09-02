@@ -533,7 +533,7 @@ float AVXDistanceInnerProductFloat::compare(const float *a, const float *b, uint
     float result = 0.0f;
 #ifdef __APPLE__
     vDSP_dotpr(a, (vDSP_Stride)1, b, (vDSP_Stride)1, &result, size);
-#else
+#elif defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86) || defined(_WINDOWS)
 #define AVX_DOT(addr1, addr2, dest, tmp1, tmp2)                                                                        \
     tmp1 = _mm256_loadu_ps(addr1);                                                                                     \
     tmp2 = _mm256_loadu_ps(addr2);                                                                                     \
@@ -569,6 +569,12 @@ float AVXDistanceInnerProductFloat::compare(const float *a, const float *b, uint
     }
     _mm256_storeu_ps(unpack, sum);
     result = unpack[0] + unpack[1] + unpack[2] + unpack[3] + unpack[4] + unpack[5] + unpack[6] + unpack[7];
+#else
+    // Generic implementation for ARM64 and other architectures
+    for (uint32_t i = 0; i < size; i++)
+    {
+        result += a[i] * b[i];
+    }
 #endif
     return -result;
 }
