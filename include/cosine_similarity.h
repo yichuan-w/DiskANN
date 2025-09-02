@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <stdexcept>
 
-#ifndef __APPLE__
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86) || defined(_WINDOWS)
 #include <immintrin.h>
 #include <smmintrin.h>
 #include <tmmintrin.h>
