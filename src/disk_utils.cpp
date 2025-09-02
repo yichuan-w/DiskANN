@@ -9,6 +9,8 @@
 
 #ifdef __APPLE__
 #include <Accelerate/Accelerate.h>
+#elif defined(USE_OPENBLAS)
+#include <cblas.h>
 #else
 #include "mkl.h"
 #endif
@@ -1336,7 +1338,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     if (num_threads != 0)
     {
         omp_set_num_threads(num_threads);
-#if defined(__x86_64__) && !defined(__APPLE__)
+#if defined(__x86_64__) && !defined(__APPLE__) && !defined(USE_OPENBLAS)
         mkl_set_num_threads(num_threads);
 #endif
     }

@@ -268,18 +268,13 @@ elseif(APPLE)
     set(DISKANN_ACCEL_LINK_OPTIONS ${ACCELERATE_LIBRARY})
     add_compile_definitions(ACCELERATE_NEW_LAPACK)
 else()
-    # expected path for manual intel mkl installs
+    # Try to find Intel MKL first
     set(POSSIBLE_OMP_PATHS "/opt/intel/oneapi/compiler/2025.0/lib/libiomp5.so;/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/libiomp5.so;/usr/lib/x86_64-linux-gnu/libiomp5.so;/opt/intel/lib/intel64_lin/libiomp5.so")
     foreach(POSSIBLE_OMP_PATH ${POSSIBLE_OMP_PATHS})
         if (EXISTS ${POSSIBLE_OMP_PATH})
             get_filename_component(OMP_PATH ${POSSIBLE_OMP_PATH} DIRECTORY)
         endif()
     endforeach()
-
-    if(NOT OMP_PATH)
-        message(FATAL_ERROR "Could not find Intel OMP in standard locations; use -DOMP_PATH to specify the install location for your environment")
-    endif()
-    link_directories(${OMP_PATH})
 
     set(POSSIBLE_MKL_LIB_PATHS "/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_core.so;/usr/lib/x86_64-linux-gnu/libmkl_core.so;/opt/intel/mkl/lib/intel64/libmkl_core.so")
     foreach(POSSIBLE_MKL_LIB_PATH ${POSSIBLE_MKL_LIB_PATHS})
@@ -294,32 +289,49 @@ else()
             set(MKL_INCLUDE_PATH ${POSSIBLE_MKL_INCLUDE_PATH})
         endif()
     endforeach()
-    if(NOT MKL_PATH)
-        message(FATAL_ERROR "Could not find Intel MKL in standard locations; use -DMKL_PATH to specify the install location for your environment")
-    elseif(NOT MKL_INCLUDE_PATH)
-        message(FATAL_ERROR "Could not find Intel MKL in standard locations; use -DMKL_INCLUDE_PATH to specify the install location for headers for your environment")
-    endif()
-    if (EXISTS ${MKL_PATH}/libmkl_def.so.2)
-        set(MKL_DEF_SO ${MKL_PATH}/libmkl_def.so.2)
-    elseif(EXISTS ${MKL_PATH}/libmkl_def.so)
-        set(MKL_DEF_SO ${MKL_PATH}/libmkl_def.so)
-    else()
-        message(FATAL_ERROR "Despite finding MKL, libmkl_def.so was not found in expected locations.")
-    endif()
-    link_directories(${MKL_PATH})
-    include_directories(${MKL_INCLUDE_PATH})
-
-    # compile flags 
-    # if gcc/g++
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        add_compile_options(-m64 -Wl,--no-as-needed)
-    endif()
     
-    # Define MKL libraries for target-specific linking (avoids contaminating all targets)
-    # Use dynamic linking with mkl_rt - simpler, more reliable, works across platforms
-    set(_MKL_LIBS mkl_rt iomp5 pthread m dl)
+    # Check if we found Intel MKL
+    if(MKL_PATH AND MKL_INCLUDE_PATH AND OMP_PATH)
+        message(STATUS "Found Intel MKL - using Intel MKL for BLAS/LAPACK")
+        if (EXISTS ${MKL_PATH}/libmkl_def.so.2)
+            set(MKL_DEF_SO ${MKL_PATH}/libmkl_def.so.2)
+        elseif(EXISTS ${MKL_PATH}/libmkl_def.so)
+            set(MKL_DEF_SO ${MKL_PATH}/libmkl_def.so)
+        else()
+            message(FATAL_ERROR "Despite finding MKL, libmkl_def.so was not found in expected locations.")
+        endif()
+        link_directories(${MKL_PATH})
+        link_directories(${OMP_PATH})
+        include_directories(${MKL_INCLUDE_PATH})
 
-    add_definitions(-DMKL_ILP64)
+        # compile flags 
+        # if gcc/g++
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            add_compile_options(-m64 -Wl,--no-as-needed)
+        endif()
+        
+        # Define MKL libraries for target-specific linking (avoids contaminating all targets)
+        # Use dynamic linking with mkl_rt - simpler, more reliable, works across platforms
+        set(_MKL_LIBS mkl_rt iomp5 pthread m dl)
+        add_definitions(-DMKL_ILP64)
+        set(DISKANN_USE_MKL ON)
+    else()
+        # Fallback to OpenBLAS/standard BLAS libraries
+        message(STATUS "Intel MKL not found - falling back to OpenBLAS/standard BLAS")
+        
+        find_package(BLAS REQUIRED)
+        find_package(LAPACK REQUIRED)
+        
+        # Define fallback libraries for target-specific linking
+        set(_BLAS_LIBS ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} pthread m dl)
+        
+        # Add OpenBLAS-specific definitions to mimic MKL interface
+        add_definitions(-DUSE_OPENBLAS)
+        set(DISKANN_USE_MKL OFF)
+        
+        message(STATUS "Using BLAS libraries: ${BLAS_LIBRARIES}")
+        message(STATUS "Using LAPACK libraries: ${LAPACK_LIBRARIES}")
+    endif()
 endif()
 
 
@@ -574,51 +586,60 @@ target_link_libraries(diskann ${PYBIND11_LIBRARIES})
 target_link_libraries(diskann_s ${PYBIND11_LIBRARIES})
 
 ###############################################################################
-# MKL LINKING - Apply to specific targets (after all targets are defined)
+# BLAS/LAPACK LINKING - Apply to specific targets (after all targets are defined)
 ###############################################################################
 if(UNIX AND NOT APPLE)
-    # Helper function to link MKL libraries to targets that need mathematical operations
-    function(link_mkl_if_target_exists target_name)
+    # Helper function to link math libraries to targets that need mathematical operations
+    function(link_math_libs_if_target_exists target_name)
         if(TARGET ${target_name})
-            target_link_libraries(${target_name} PRIVATE ${_MKL_LIBS})
-            message(STATUS "Linked MKL to target: ${target_name}")
+            if(DISKANN_USE_MKL)
+                target_link_libraries(${target_name} PRIVATE ${_MKL_LIBS})
+                message(STATUS "Linked Intel MKL to target: ${target_name}")
+            else()
+                target_link_libraries(${target_name} PRIVATE ${_BLAS_LIBS})
+                message(STATUS "Linked BLAS/LAPACK to target: ${target_name}")
+            endif()
         endif()
     endfunction()
     
-    message(STATUS "Applying MKL linking with dynamic libraries: ${_MKL_LIBS}")
+    if(DISKANN_USE_MKL)
+        message(STATUS "Applying Intel MKL linking with dynamic libraries: ${_MKL_LIBS}")
+    else()
+        message(STATUS "Applying BLAS/LAPACK linking with libraries: ${_BLAS_LIBS}")
+    endif()
     
     # Core libraries
-    link_mkl_if_target_exists(diskann)
-    link_mkl_if_target_exists(diskann_s)
+    link_math_libs_if_target_exists(diskann)
+    link_math_libs_if_target_exists(diskann_s)
     
     # Graph partition tools
-    link_mkl_if_target_exists(partitioner)
-    link_mkl_if_target_exists(index_relayout)
+    link_math_libs_if_target_exists(partitioner)
+    link_math_libs_if_target_exists(index_relayout)
     
     # Main applications (these definitely use DiskANN math operations)
-    link_mkl_if_target_exists(build_memory_index)
-    link_mkl_if_target_exists(build_stitched_index)
-    link_mkl_if_target_exists(search_memory_index)
-    link_mkl_if_target_exists(build_disk_index)
-    link_mkl_if_target_exists(search_disk_index)
-    link_mkl_if_target_exists(range_search_disk_index)
-    link_mkl_if_target_exists(test_streaming_scenario)
-    link_mkl_if_target_exists(test_insert_deletes_consolidate)
+    link_math_libs_if_target_exists(build_memory_index)
+    link_math_libs_if_target_exists(build_stitched_index)
+    link_math_libs_if_target_exists(search_memory_index)
+    link_math_libs_if_target_exists(build_disk_index)
+    link_math_libs_if_target_exists(search_disk_index)
+    link_math_libs_if_target_exists(range_search_disk_index)
+    link_math_libs_if_target_exists(test_streaming_scenario)
+    link_math_libs_if_target_exists(test_insert_deletes_consolidate)
     
     # Utilities that perform mathematical operations
-    link_mkl_if_target_exists(compute_groundtruth)
-    link_mkl_if_target_exists(compute_groundtruth_for_filters)
-    link_mkl_if_target_exists(calculate_recall)
-    link_mkl_if_target_exists(vector_analysis)
-    link_mkl_if_target_exists(simulate_aggregate_recall)
+    link_math_libs_if_target_exists(compute_groundtruth)
+    link_math_libs_if_target_exists(compute_groundtruth_for_filters)
+    link_math_libs_if_target_exists(calculate_recall)
+    link_math_libs_if_target_exists(vector_analysis)
+    link_math_libs_if_target_exists(simulate_aggregate_recall)
     
     # REST API servers
-    link_mkl_if_target_exists(inmem_server)
-    link_mkl_if_target_exists(ssd_server)
-    link_mkl_if_target_exists(multiple_ssdindex_server)
+    link_math_libs_if_target_exists(inmem_server)
+    link_math_libs_if_target_exists(ssd_server)
+    link_math_libs_if_target_exists(multiple_ssdindex_server)
     
     # Python extension if built
-    link_mkl_if_target_exists(_diskannpy)
+    link_math_libs_if_target_exists(_diskannpy)
     
-    message(STATUS "MKL linking configuration completed")
+    message(STATUS "Math library linking configuration completed")
 endif()

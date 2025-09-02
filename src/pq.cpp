@@ -3,6 +3,9 @@
 
 #ifdef __APPLE__
 #include <Accelerate/Accelerate.h>
+#elif defined(USE_OPENBLAS)
+#include <cblas.h>
+#include <lapacke.h>
 #else
 #include "mkl.h"
 #if defined(DISKANN_RELEASE_UNUSED_TCMALLOC_MEMORY_AT_CHECKPOINTS) && defined(DISKANN_BUILD)
@@ -20,7 +23,7 @@
 namespace diskann
 {
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(USE_OPENBLAS)
 typedef long long int MKL_INT;
 #endif
 

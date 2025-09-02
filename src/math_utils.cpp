@@ -5,6 +5,8 @@
 #include <math_utils.h>
 #ifdef __APPLE__
 #include <Accelerate/Accelerate.h>
+#elif defined(USE_OPENBLAS)
+#include <cblas.h>
 #else
 #include <mkl.h>
 #endif
@@ -14,7 +16,7 @@
 namespace math_utils
 {
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(USE_OPENBLAS)
 typedef int MKL_INT;
 #endif
 

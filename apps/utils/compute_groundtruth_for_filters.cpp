@@ -15,7 +15,13 @@
 #include <cstring>
 #include <queue>
 #include <omp.h>
+#ifdef __APPLE__
+#include <Accelerate/Accelerate.h>
+#elif defined(USE_OPENBLAS)
+#include <cblas.h>
+#else
 #include <mkl.h>
+#endif
 #include <boost/program_options.hpp>
 #include <unordered_map>
 #include <tsl/robin_map.h>
