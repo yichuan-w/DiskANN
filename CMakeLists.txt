@@ -569,6 +569,17 @@ set(WITH_DOCS OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(BUILD_STATIC ON CACHE BOOL "" FORCE)
 
+# Configure polling method for different platforms
+if(UNIX AND NOT APPLE)
+    # Use epoll on Linux systems (including ARM64)
+    set(POLLER "epoll" CACHE STRING "" FORCE)
+    set(ZMQ_USE_EPOLL ON CACHE BOOL "" FORCE)
+elseif(APPLE)
+    # Use kqueue on macOS
+    set(POLLER "kqueue" CACHE STRING "" FORCE)
+    set(ZMQ_USE_KQUEUE ON CACHE BOOL "" FORCE)
+endif()
+
 add_subdirectory(third_party/libzmq)
 
 # Set ZeroMQ variables for compatibility
