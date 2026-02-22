@@ -600,11 +600,13 @@ target_include_directories(diskann PRIVATE
     ${Protobuf_INCLUDE_DIRS}
 )
 
-target_link_libraries(diskann_s PRIVATE proto_embeddings protobuf::libprotobuf)
-target_include_directories(diskann_s PRIVATE 
-    ${CMAKE_CURRENT_BINARY_DIR}
-    ${Protobuf_INCLUDE_DIRS}
-)
+if(TARGET diskann_s)
+    target_link_libraries(diskann_s PRIVATE proto_embeddings protobuf::libprotobuf)
+    target_include_directories(diskann_s PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${Protobuf_INCLUDE_DIRS}
+    )
+endif()
 
 
 ###############################################################################
@@ -639,11 +641,15 @@ set(ZeroMQ_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libzmq/include)
 message(STATUS "Found ZeroMQ: ${ZeroMQ_LIBRARY}")
 include_directories(${ZeroMQ_INCLUDE_DIR})
 target_link_libraries(diskann PRIVATE ${ZeroMQ_LIBRARY})
-target_link_libraries(diskann_s PRIVATE ${ZeroMQ_LIBRARY})
+if(TARGET diskann_s)
+    target_link_libraries(diskann_s PRIVATE ${ZeroMQ_LIBRARY})
+endif()
 add_definitions(-DUSE_ZEROMQ)
 
 target_link_libraries(diskann ${PYBIND11_LIBRARIES})
-target_link_libraries(diskann_s ${PYBIND11_LIBRARIES})
+if(TARGET diskann_s)
+    target_link_libraries(diskann_s ${PYBIND11_LIBRARIES})
+endif()
 
 ###############################################################################
 # BLAS/LAPACK LINKING - Apply to specific targets (after all targets are defined)
