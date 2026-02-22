@@ -442,7 +442,7 @@ endif()
 #Main compiler/linker settings 
 if(MSVC)
 	#language options
-	add_compile_options(/permissive- /openmp:experimental /Zc:twoPhase- /Zc:inline /WX- /std:c++17 /Gd /W3 /MP /Zi /FC /nologo)
+	add_compile_options(/permissive- /openmp:experimental /Zc:twoPhase- /Zc:inline /WX- /wd4661 /std:c++17 /Gd /W3 /MP /Zi /FC /nologo)
 	#code generation options
 	add_compile_options(/arch:AVX2 /fp:fast /fp:except- /EHsc /GS- /Gy)
 	#optimization options
