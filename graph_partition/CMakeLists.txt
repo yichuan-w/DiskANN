@@ -16,11 +16,13 @@ message(STATUS "OpenMP disabled for compatibility")
 # OpenMP - disabled for compatibility
 message(STATUS "OpenMP disabled for compatibility")
 
-#boost
-find_package(Boost COMPONENTS program_options REQUIRED)
-
-add_executable(partitioner src/partitioner.cpp)
-target_link_libraries(partitioner PUBLIC Boost::program_options)
+# `partitioner` is a CLI tool and not required for Python wheel builds.
+# Skip it under PYBIND to avoid unnecessary Boost linkage in CI wheel jobs.
+if(NOT PYBIND)
+    find_package(Boost COMPONENTS program_options REQUIRED)
+    add_executable(partitioner src/partitioner.cpp)
+    target_link_libraries(partitioner PUBLIC Boost::program_options)
+endif()
 
 add_executable(index_relayout index_relayout.cpp)
 target_link_libraries(index_relayout PUBLIC)
