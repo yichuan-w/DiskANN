@@ -558,6 +558,7 @@ set(ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zlib ${CMAKE_CURRE
 # PROTOBUF SECTION - Use submodule
 ###############################################################################
 find_package(Protobuf REQUIRED)
+find_package(absl CONFIG QUIET)
 
 # Set protobuf variables for compatibility
 set(Protobuf_FOUND TRUE)
@@ -608,6 +609,26 @@ target_include_directories(proto_embeddings PUBLIC
     ${Protobuf_INCLUDE_DIRS}
 )
 
+# Protobuf packages on Windows may require explicit Abseil link targets.
+set(_DISKANN_PROTO_ABSL_TARGETS "")
+if(WIN32)
+    foreach(_absl_target IN ITEMS
+        absl::check
+        absl::log
+        absl::absl_check
+        absl::absl_log
+        absl::log_internal_check_op
+        absl::log_internal_message
+    )
+        if(TARGET ${_absl_target})
+            list(APPEND _DISKANN_PROTO_ABSL_TARGETS ${_absl_target})
+        endif()
+    endforeach()
+endif()
+if(_DISKANN_PROTO_ABSL_TARGETS)
+    target_link_libraries(proto_embeddings PUBLIC ${_DISKANN_PROTO_ABSL_TARGETS})
+endif()
+
 target_link_libraries(diskann PRIVATE proto_embeddings protobuf::libprotobuf)
 target_include_directories(diskann PRIVATE 
     ${CMAKE_CURRENT_BINARY_DIR}
@@ -621,6 +642,7 @@ if(TARGET diskann_s)
         ${Protobuf_INCLUDE_DIRS}
     )
 endif()
+unset(_DISKANN_PROTO_ABSL_TARGETS)
 
 
 ###############################################################################
