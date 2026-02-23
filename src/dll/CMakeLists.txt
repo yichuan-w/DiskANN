@@ -15,6 +15,8 @@ if (NOT PYBIND)
 endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE _USRDLL _WINDLL)
 target_compile_options(${PROJECT_NAME} PRIVATE /GL)
+set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
+target_compile_options(${PROJECT_NAME} PRIVATE /WX-)
 target_include_directories(${PROJECT_NAME} PRIVATE ${DISKANN_MKL_INCLUDE_DIRECTORIES})
 
 target_link_options(${PROJECT_NAME} PRIVATE /DLL /IMPLIB:${DISKANN_DLL_IMPLIB} /LTCG)
