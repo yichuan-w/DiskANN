@@ -29,6 +29,7 @@ inline void omp_set_num_threads(int num_threads) {
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -229,7 +230,7 @@ class graph_partitioner {
     direct_graph.clear();
     direct_graph.resize(full_graph.size());
 #pragma omp parallel for
-    for (unsigned i = 0; i < _nd; i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
       direct_graph[i].assign(full_graph[i].begin(), full_graph[i].end());
     }
     // cut graph
@@ -237,7 +238,7 @@ class graph_partitioner {
       std::cout << "direct graph will be cut, it degree become "<<cut << std::endl;
     }
 #pragma omp parallel for
-    for (unsigned i = 0; i < _nd; i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
       if (cut < direct_graph[i].size()) {
         direct_graph[i].resize(cut);
       }
@@ -245,8 +246,8 @@ class graph_partitioner {
     // reverse graph
     std::vector<std::mutex> ms(_nd);
     reverse_graph.resize(_nd);
-#pragma omp parallel for shared(reverse_graph, direct_graph)
-    for (unsigned i = 0; i < _nd; i++) {
+#pragma omp parallel for
+    for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
       for (unsigned j = 0; j < direct_graph[i].size(); j++) {
         std::lock_guard<std::mutex> lock(ms[direct_graph[i][j]]);
         reverse_graph[direct_graph[i][j]].emplace_back(i);
@@ -335,8 +336,8 @@ class graph_partitioner {
       _partition_number = ROUND_UP(_nd, C) / C;
       reverse_graph.resize(_nd);
       std::vector<std::mutex> ms(_nd);
-#pragma omp parallel for shared(reverse_graph, direct_graph)
-      for (unsigned i = 0; i < _nd; i++) {
+#pragma omp parallel for
+      for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
         for (unsigned j = 0; j < direct_graph[i].size(); j++) {
           std::lock_guard<std::mutex> lock(ms[direct_graph[i][j]]);
           reverse_graph[direct_graph[i][j]].emplace_back(i);
@@ -383,7 +384,7 @@ class graph_partitioner {
       full_graph.resize(_nd);
       _u64 des = 0;
 #pragma omp parallel for schedule(dynamic, 1) reduction(+ : des)
-      for (unsigned i = 0; i < _partition_number; i++) {
+      for (int64_t i = 0; i < static_cast<int64_t>(_partition_number); i++) {
         std::unique_ptr<char[]> sector_buf = std::make_unique<char[]>(SECTOR_LEN);
         memcpy(sector_buf.get(), mem_index.get() + i * SECTOR_LEN, SECTOR_LEN);
         for (unsigned j = 0; j < C && i * C + j < _nd; j++) {
@@ -492,7 +493,7 @@ class graph_partitioner {
     double overlap_ratio = 0;
 
 #pragma omp parallel for schedule(dynamic, 100) reduction(+ : overlap_ratio)
-    for (size_t i = 0; i < _partition_number; i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(_partition_number); i++) {
       std::unordered_set<unsigned> neighbors;
       unsigned blk_neighbor_num = 0;
       unsigned part_size = _partition[i].size();
@@ -543,7 +544,7 @@ class graph_partitioner {
     if (allow_dup) {
       double repeated_ratio = 0;
 #pragma omp parallel for schedule(dynamic, 100) reduction(+ : repeated_ratio)
-      for (size_t i = 0; i < _nd; i++) {
+      for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
         int repeat_cnt = 0;
         std::unordered_set<unsigned> nbrs;
         for (size_t j = 0; j < id2pids[i].size(); j++) {
@@ -568,7 +569,7 @@ class graph_partitioner {
       std::cout << "repeat pair ratio: " << repeated_ratio / _nd << std::endl;
       double effiective_overlap_ratio = 0;
 #pragma omp parallel for schedule(dynamic, 100) reduction(+ : effiective_overlap_ratio)
-      for (size_t i = 0; i < _nd; i++) {
+      for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
         std::unordered_set<unsigned> nbrs;
         std::unordered_set<unsigned> real_tar;
         std::unordered_set<unsigned> ne;  // neighbors in graph
@@ -751,7 +752,7 @@ class graph_partitioner {
   void graph_partition_LDG() {
     free_q.clear();
 #pragma omp parallel for
-    for (unsigned i = 0; i < _partition_number; i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(_partition_number); i++) {
       if (_lock_pids[i]) continue;
       _partition[i].clear();
       free_q.push(i);
@@ -765,7 +766,7 @@ class graph_partitioner {
     std::shuffle(std::begin(stream), std::end(stream), rng);
     auto start = omp_get_wtime();
 #pragma omp parallel for schedule(dynamic)
-    for (unsigned i = 0; i < _nd; i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
       size_t n = stream[i];
       if (_lock_nodes[n]) continue;
       sync(n);
@@ -973,12 +974,12 @@ class graph_partitioner {
   void graph_partition_LDG_dup() {
     free_q.clear();
 #pragma omp parallel for schedule(dynamic)
-    for (unsigned i = 0; i < _partition_number; i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(_partition_number); i++) {
       _partition[i].clear();
       free_q.push(i);
     }
 #pragma omp parallel for schedule(dynamic)
-    for (unsigned i = 0; i < _nd; i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
       store_cnt[i] = 0;
     }
 
@@ -989,13 +990,13 @@ class graph_partitioner {
     std::shuffle(std::begin(stream), std::end(stream), rng);
     auto start = omp_get_wtime();
 #pragma omp parallel for schedule(dynamic)
-    for (unsigned i = 0; i < _nd; i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
       size_t n = stream[i];
       sync_dup(n);
     }
 
 #pragma omp parallel for schedule(dynamic)
-    for (unsigned i = 0; i < _nd; i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(_nd); i++) {
       id2pids[i].clear();
       id2pids[i].push_back(id2pid[i]);
     }

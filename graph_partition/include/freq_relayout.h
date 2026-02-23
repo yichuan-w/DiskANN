@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <memory_resource>
@@ -44,7 +45,7 @@ void read_freq_from_dist(std::vector<puu>& freq_list, vpu &freq_nei_list, std::s
   // std::sort(freq_list.begin(), freq_list.end(),
   //           [](puu &left, puu &right) -> bool { return left.second > right.second; });
 #pragma omp parallel for schedule(dynamic, 1000)
-  for (unsigned i = 0; i < full_graph.size(); i++) {
+  for (int64_t i = 0; i < static_cast<int64_t>(full_graph.size()); i++) {
     unsigned j = 0;
     for (auto v : full_graph[i]) {
       if (dist_in_graph[v] > 0) {
@@ -87,7 +88,7 @@ void relayout_adj(vpu &freq_nei_list, vvu &full_graph) {
   std::vector<unsigned> tmp_adj(100);
   std::unordered_set<unsigned> vis;
 #pragma omp parallel for schedule(dynamic, 1000) private(tmp_adj, vis)
-  for (unsigned i = 0; i < full_graph.size(); i++) {
+  for (int64_t i = 0; i < static_cast<int64_t>(full_graph.size()); i++) {
     std::sort(freq_nei_list[i].begin(), freq_nei_list[i].end(),
               [](puu &left, puu &right) -> bool { return left.second > right.second; });
     tmp_adj.clear();
