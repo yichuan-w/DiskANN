@@ -69,14 +69,36 @@ if(NOT VERSION_INFO)
 endif()
 target_compile_definitions(_diskannpy PRIVATE VERSION_INFO="${VERSION_INFO}")
 
-# Add a post-build command to automatically copy the compiled Python module
+# Add post-build commands for editable installs.
+# Windows editable installs need runtime DLLs next to _diskannpy.pyd.
 if(UPDATE_EDITABLE_INSTALL)
-add_custom_command(
-TARGET _diskannpy
-POST_BUILD
-COMMAND ${CMAKE_COMMAND} -E copy 
-        ${CMAKE_CURRENT_BINARY_DIR}/_diskannpy.cpython-*.so
-        ${CMAKE_SOURCE_DIR}/python/src/
-COMMENT "Copying Python module to python/src directory"
-)
+    if(MSVC)
+        set(LEANN_DISKANN_PY_PACKAGE_DIR "${CMAKE_SOURCE_DIR}/../../leann_backend_diskann")
+        add_custom_command(
+            TARGET _diskannpy
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${LEANN_DISKANN_PY_PACKAGE_DIR}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:_diskannpy>" "${LEANN_DISKANN_PY_PACKAGE_DIR}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${PROJECT_NAME}>" "${LEANN_DISKANN_PY_PACKAGE_DIR}"
+            COMMENT "Copying editable Windows artifacts for leann_backend_diskann"
+        )
+        foreach(RUNTIME_FILE IN LISTS OPENMP_WINDOWS_RUNTIME_FILES TCMALLOC_WINDOWS_RUNTIME_FILES)
+            if(RUNTIME_FILE MATCHES "\\.dll$")
+                add_custom_command(
+                    TARGET _diskannpy
+                    POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${RUNTIME_FILE}" "${LEANN_DISKANN_PY_PACKAGE_DIR}"
+                )
+            endif()
+        endforeach()
+    else()
+        add_custom_command(
+            TARGET _diskannpy
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    ${CMAKE_CURRENT_BINARY_DIR}/_diskannpy.cpython-*.so
+                    ${CMAKE_SOURCE_DIR}/python/src/
+            COMMENT "Copying Python module to python/src directory"
+        )
+    endif()
 endif()
