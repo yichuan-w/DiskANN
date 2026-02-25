@@ -539,6 +539,22 @@ if(PYBIND)
         DESTINATION leann_backend_diskann
         COMPONENT python_modules
     )
+    if(MSVC)
+        # Bundle the native DiskANN runtime and required Windows DLL dependencies
+        # beside the Python extension module so import works without external PATH setup.
+        install(TARGETS ${PROJECT_NAME}
+            RUNTIME DESTINATION leann_backend_diskann
+            COMPONENT python_modules
+        )
+        install(
+            FILES
+                ${OPENMP_WINDOWS_RUNTIME_FILES}
+                ${TCMALLOC_WINDOWS_RUNTIME_FILES}
+            DESTINATION leann_backend_diskann
+            COMPONENT python_modules
+            OPTIONAL
+        )
+    endif()
 
 endif()
 
