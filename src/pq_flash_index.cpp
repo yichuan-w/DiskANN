@@ -1569,7 +1569,11 @@ struct ZmqContextManager
     {
         if (g_zmq_context)
         {
-            zmq_ctx_destroy(g_zmq_context);
+            // Search threads keep their thread_local REQ sockets until the threads exit,
+            // which for OpenMP workers is after static destructors run. zmq_ctx_destroy()
+            // waits for every socket to close, so it would block process exit forever;
+            // zmq_ctx_shutdown() only fails pending operations and returns.
+            zmq_ctx_shutdown(g_zmq_context);
             g_zmq_context = nullptr;
         }
     }
